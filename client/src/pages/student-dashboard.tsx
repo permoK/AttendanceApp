@@ -9,7 +9,7 @@ import { StudentAttendanceTable } from "@/components/student/attendance-table";
 import { FaceRecognitionModal } from "@/components/student/face-recognition-modal";
 import { Course, Attendance } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
-import { BellRing } from "lucide-react";
+import { AlertCircle, BellRing } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function StudentDashboard() {

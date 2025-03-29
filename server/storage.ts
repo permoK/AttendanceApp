@@ -20,6 +20,8 @@ export interface IStorage {
   getCourse(id: number): Promise<Course | undefined>;
   getCoursesByLecturer(lecturerId: number): Promise<Course[]>;
   getActiveCourses(): Promise<Course[]>;
+  getAllCourses(): Promise<Course[]>;
+  getDepartments(): Promise<string[]>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourseStatus(id: number, isActive: boolean): Promise<Course | undefined>;
   
@@ -35,7 +37,7 @@ export interface IStorage {
   getAttendanceByCourseAndDate(courseId: number, date: Date): Promise<Attendance[]>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: any; // Using any type as a workaround
 }
 
 export class MemStorage implements IStorage {
@@ -44,7 +46,7 @@ export class MemStorage implements IStorage {
   private studentCourses: Map<number, StudentCourse>;
   private attendanceRecords: Map<number, Attendance>;
   
-  sessionStore: session.SessionStore;
+  sessionStore: any; // Using any type as a workaround
   
   private userId: number;
   private courseId: number;
@@ -71,8 +73,8 @@ export class MemStorage implements IStorage {
   }
 
   private seedDemoData() {
-    // Add a lecturer
-    this.createUser({
+    // Add lecturers
+    const lecturer1 = this.createUser({
       username: "lecturer",
       password: "$2b$10$hACwQ5/HsfBGJhbx3ypR8.bEoCB7v.5wX4VTp/P.JWsBXQz1cHdLm", // "password"
       name: "Dr. Sarah Johnson",
@@ -83,8 +85,19 @@ export class MemStorage implements IStorage {
       faceData: null
     });
     
-    // Add a student
-    this.createUser({
+    const lecturer2 = this.createUser({
+      username: "profsmith",
+      password: "$2b$10$hACwQ5/HsfBGJhbx3ypR8.bEoCB7v.5wX4VTp/P.JWsBXQz1cHdLm", // "password"
+      name: "Prof. John Smith",
+      role: "lecturer",
+      studentId: "",
+      department: "Electrical Engineering",
+      year: null,
+      faceData: null
+    });
+    
+    // Add students
+    const student1 = this.createUser({
       username: "student",
       password: "$2b$10$hACwQ5/HsfBGJhbx3ypR8.bEoCB7v.5wX4VTp/P.JWsBXQz1cHdLm", // "password"
       name: "John Smith",
@@ -93,6 +106,83 @@ export class MemStorage implements IStorage {
       department: "Computer Science",
       year: 3,
       faceData: null
+    });
+    
+    const student2 = this.createUser({
+      username: "alice",
+      password: "$2b$10$hACwQ5/HsfBGJhbx3ypR8.bEoCB7v.5wX4VTp/P.JWsBXQz1cHdLm", // "password"
+      name: "Alice Johnson",
+      role: "student",
+      studentId: "ST12346",
+      department: "Computer Science",
+      year: 2,
+      faceData: null
+    });
+    
+    const student3 = this.createUser({
+      username: "bob",
+      password: "$2b$10$hACwQ5/HsfBGJhbx3ypR8.bEoCB7v.5wX4VTp/P.JWsBXQz1cHdLm", // "password"
+      name: "Bob Williams",
+      role: "student",
+      studentId: "ST12347",
+      department: "Electrical Engineering",
+      year: 3,
+      faceData: null
+    });
+    
+    // Add courses
+    const course1 = this.createCourse({
+      code: "CS101",
+      name: "Introduction to Computer Science",
+      department: "Computer Science",
+      year: 1,
+      lecturerId: 1, // Dr. Sarah Johnson
+      schedule: "MWF 10:00 AM - 11:30 AM",
+      isActive: false,
+      activatedAt: null
+    });
+    
+    const course2 = this.createCourse({
+      code: "CS301",
+      name: "Database Systems",
+      department: "Computer Science",
+      year: 3,
+      lecturerId: 1, // Dr. Sarah Johnson
+      schedule: "TTh 1:00 PM - 2:30 PM",
+      isActive: false,
+      activatedAt: null
+    });
+    
+    const course3 = this.createCourse({
+      code: "EE202",
+      name: "Circuit Analysis",
+      department: "Electrical Engineering",
+      year: 2,
+      lecturerId: 2, // Prof. John Smith
+      schedule: "MWF 2:00 PM - 3:30 PM",
+      isActive: false,
+      activatedAt: null
+    });
+    
+    // Enroll students in courses
+    this.addStudentToCourse({
+      studentId: 3, // John Smith
+      courseId: 1 // Intro to CS
+    });
+    
+    this.addStudentToCourse({
+      studentId: 3, // John Smith
+      courseId: 2 // Database Systems
+    });
+    
+    this.addStudentToCourse({
+      studentId: 4, // Alice Johnson
+      courseId: 1 // Intro to CS
+    });
+    
+    this.addStudentToCourse({
+      studentId: 5, // Bob Williams
+      courseId: 3 // Circuit Analysis
     });
   }
 
@@ -130,6 +220,35 @@ export class MemStorage implements IStorage {
 
   async getActiveCourses(): Promise<Course[]> {
     return Array.from(this.courses.values()).filter(course => course.isActive);
+  }
+  
+  async getAllCourses(): Promise<Course[]> {
+    return Array.from(this.courses.values());
+  }
+  
+  async getDepartments(): Promise<string[]> {
+    const departments = new Set<string>();
+    
+    // Get unique departments from courses
+    Array.from(this.courses.values()).forEach(course => {
+      if (course.department) {
+        departments.add(course.department);
+      }
+    });
+    
+    // Get unique departments from users (especially lecturers)
+    Array.from(this.users.values()).forEach(user => {
+      if (user.department) {
+        departments.add(user.department);
+      }
+    });
+    
+    // Default departments if none found
+    if (departments.size === 0) {
+      return ["Computer Science", "Electrical Engineering", "Mechanical Engineering", "Civil Engineering", "Business Administration"];
+    }
+    
+    return Array.from(departments);
   }
 
   async createCourse(insertCourse: InsertCourse): Promise<Course> {

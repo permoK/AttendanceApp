@@ -19,6 +19,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply school network middleware to all routes
   app.use(schoolNetworkOnly);
   
+  // Get departments for registration and course creation
+  app.get("/api/departments", async (req, res) => {
+    const departments = await storage.getDepartments();
+    return res.json(departments);
+  });
+  
+  // Get all courses (for enrollment)
+  app.get("/api/all-courses", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const courses = await storage.getAllCourses();
+    return res.json(courses);
+  });
+  
   // Course management routes
   app.get("/api/courses", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -148,6 +164,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: validationError.message });
       }
       res.status(500).json({ message: "Failed to enroll student in course" });
+    }
+  });
+  
+  // Face recognition data management
+  app.post("/api/face-data", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    try {
+      const { faceData } = req.body;
+      
+      if (!faceData) {
+        return res.status(400).json({ message: "Face data is required" });
+      }
+      
+      const updatedUser = await storage.updateUserFaceData(req.user.id, faceData);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Return user without password
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error saving face data:", error);
+      res.status(500).json({ message: "Failed to save face data" });
     }
   });
   

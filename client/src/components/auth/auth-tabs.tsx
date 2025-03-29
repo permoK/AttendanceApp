@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,20 @@ import { z } from 'zod';
 import { loginSchema, insertUserSchema } from '@shared/schema';
 import { useAuth } from '@/hooks/use-auth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserCheck } from 'lucide-react';
+import { UserCheck, Camera, Check, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { useQuery } from '@tanstack/react-query';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { loadModels, setupWebcam, stopWebcam, captureFaceData } from '@/lib/face-recognition';
+import { apiRequest } from '@/lib/queryClient';
 
 const loginFormSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -35,7 +47,24 @@ const registerFormSchema = insertUserSchema.extend({
 
 export function AuthTabs() {
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [faceVerificationStatus, setFaceVerificationStatus] = useState<'initial' | 'success' | 'error' | 'registering'>('initial');
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [registeredUser, setRegisteredUser] = useState<any>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { loginMutation, registerMutation } = useAuth();
+  
+  // Fetch departments for dropdown
+  const { data: departments = [] } = useQuery<string[]>({
+    queryKey: ['/api/departments'],
+    staleTime: Infinity, // Departments won't change during a session
+  });
+  
+  // Fetch all courses for potential enrollment
+  const { data: allCourses = [] } = useQuery<any[]>({
+    queryKey: ['/api/all-courses'],
+    enabled: showFaceVerification, // Only fetch when we need to show courses
+  });
   
   // Login form
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
@@ -71,7 +100,80 @@ export function AuthTabs() {
   // Handle register submission
   function onRegisterSubmit(values: z.infer<typeof registerFormSchema>) {
     const { confirmPassword, ...userData } = values;
-    registerMutation.mutate(userData);
+    registerMutation.mutate(userData, {
+      onSuccess: (user) => {
+        if (user.role === 'student') {
+          setRegisteredUser(user);
+          setShowFaceVerification(true);
+        }
+      }
+    });
+  }
+  
+  // Initialize face recognition
+  useEffect(() => {
+    if (showFaceVerification) {
+      const initFaceRecognition = async () => {
+        try {
+          await loadModels();
+          if (videoRef.current) {
+            await setupWebcam(videoRef.current);
+          }
+        } catch (error) {
+          console.error('Failed to initialize face recognition:', error);
+          setFaceVerificationStatus('error');
+        }
+      };
+      
+      initFaceRecognition();
+      
+      return () => {
+        if (videoRef.current) {
+          stopWebcam(videoRef.current);
+        }
+      };
+    }
+  }, [showFaceVerification]);
+  
+  // Handle face capturing and registration
+  async function captureAndRegisterFace() {
+    if (!videoRef.current || !registeredUser) return;
+    
+    try {
+      setFaceVerificationStatus('registering');
+      const faceData = await captureFaceData(videoRef.current);
+      
+      // Save face data to server
+      const response = await apiRequest('POST', '/api/face-data', {
+        faceData
+      });
+      
+      if (response.ok) {
+        setFaceVerificationStatus('success');
+        
+        // Handle course enrollment if courses were selected
+        if (selectedCourses.length > 0) {
+          for (const courseId of selectedCourses) {
+            await apiRequest('POST', '/api/student-courses', {
+              courseId: parseInt(courseId)
+            });
+          }
+        }
+      } else {
+        setFaceVerificationStatus('error');
+      }
+    } catch (error) {
+      console.error('Error capturing face:', error);
+      setFaceVerificationStatus('error');
+    }
+  }
+  
+  // Close modal and reset
+  function handleCloseVerification() {
+    setShowFaceVerification(false);
+    setFaceVerificationStatus('initial');
+    setSelectedCourses([]);
+    setRegisteredUser(null);
   }
   
   // Switch form based on role selection in register form
@@ -230,9 +332,21 @@ export function AuthTabs() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter your department" {...field} />
-                      </FormControl>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value || ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -308,6 +422,103 @@ export function AuthTabs() {
       <div className="mt-6 text-center text-sm text-gray-600">
         <p>Only users connected to the school network can access this system.</p>
       </div>
+      
+      {/* Face Verification Dialog */}
+      <Dialog open={showFaceVerification} onOpenChange={setShowFaceVerification}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Face Verification</DialogTitle>
+            <DialogDescription>
+              {faceVerificationStatus === 'initial' && "Please complete face verification to enable attendance marking."}
+              {faceVerificationStatus === 'success' && "Face verification successful! You can now mark attendance using face recognition."}
+              {faceVerificationStatus === 'error' && "Face verification failed. Please try again."}
+              {faceVerificationStatus === 'registering' && "Processing... Please wait."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {faceVerificationStatus === 'initial' && (
+            <div className="flex flex-col space-y-4">
+              <div className="relative bg-muted rounded-md overflow-hidden w-full h-64 mx-auto">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  muted
+                  playsInline
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="rounded-full w-52 h-52 border-2 border-dashed border-primary opacity-70" />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Select courses to enroll in (optional):</h3>
+                <MultiSelect
+                  options={allCourses.map((course: any) => ({
+                    label: `${course.code}: ${course.name}`,
+                    value: course.id.toString()
+                  }))}
+                  selected={selectedCourses}
+                  onChange={setSelectedCourses}
+                  placeholder="Select courses..."
+                />
+              </div>
+              
+              <Button 
+                onClick={captureAndRegisterFace}
+                className="w-full"
+              >
+                <Camera className="w-4 h-4 mr-2" /> Capture and Register Face
+              </Button>
+            </div>
+          )}
+          
+          {faceVerificationStatus === 'success' && (
+            <div className="flex flex-col items-center justify-center py-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Check className="w-8 h-8 text-green-600" />
+              </div>
+              <p className="text-center">Your face has been registered successfully.</p>
+              <Button 
+                className="mt-4" 
+                onClick={handleCloseVerification}
+              >
+                Continue to Dashboard
+              </Button>
+            </div>
+          )}
+          
+          {faceVerificationStatus === 'error' && (
+            <div className="flex flex-col items-center justify-center py-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+              <p className="text-center">There was an error registering your face. Please try again.</p>
+              <div className="flex space-x-2 mt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={handleCloseVerification}
+                >
+                  Skip for now
+                </Button>
+                <Button 
+                  onClick={() => setFaceVerificationStatus('initial')}
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {faceVerificationStatus === 'registering' && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <p>Processing face data...</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

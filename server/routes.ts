@@ -114,15 +114,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const activeCourses = await storage.getActiveCourses();
     
     if (req.user.role === "student") {
-      // For students, only return courses they are enrolled in
-      const studentCourses = await storage.getStudentCourses(req.user.id);
-      const studentCourseIds = studentCourses.map(course => course.id);
+      // For students, filter by:
+      // 1. Courses they're enrolled in (from student_courses table)
+      // 2. Their department
+      // 3. Their year
       
-      const activeStudentCourses = activeCourses.filter(course => 
-        studentCourseIds.includes(course.id)
+      // Get the student's details first
+      const student = await storage.getUser(req.user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Check if student has completed face verification
+      if (!student.faceData) {
+        return res.status(403).json({ 
+          message: "Face verification required", 
+          requiresFaceRegistration: true 
+        });
+      }
+      
+      // Get courses the student is enrolled in
+      const studentCourses = await storage.getStudentCourses(req.user.id);
+      const enrolledCourseIds = studentCourses.map(course => course.id);
+      
+      // Filter active courses by enrollment, department, and year
+      const filteredCourses = activeCourses.filter(course => 
+        // Either enrolled in the course OR matches student's department and year
+        enrolledCourseIds.includes(course.id) || 
+        (course.department === student.department && course.year === student.year)
       );
       
-      return res.json(activeStudentCourses);
+      return res.json(filteredCourses);
     }
     
     // For lecturers, return all active courses
@@ -202,6 +224,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
+      // Check if student has completed face verification
+      const student = await storage.getUser(req.user.id);
+      if (!student || !student.faceData) {
+        return res.status(403).json({ 
+          message: "Face verification is required before marking attendance",
+          requiresFaceRegistration: true
+        });
+      }
+      
       const { courseId, status } = insertAttendanceSchema.parse({
         ...req.body,
         studentId: req.user.id,
@@ -222,8 +253,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const studentCourses = await storage.getStudentCourses(req.user.id);
       const isEnrolled = studentCourses.some(c => c.id === courseId);
       
-      if (!isEnrolled) {
-        return res.status(403).json({ message: "You are not enrolled in this course" });
+      if (!isEnrolled && (course.department !== student.department || course.year !== student.year)) {
+        return res.status(403).json({ 
+          message: "You are not enrolled in this course and it's not in your department/year" 
+        });
       }
       
       // Check if attendance has already been marked today

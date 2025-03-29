@@ -5,11 +5,24 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User, LoginData } from "@shared/schema";
+import { User } from "@shared/schema";
+
+// Define the user interface with properties needed in Express
+interface UserWithRole extends User {
+  id: number;
+  role: "student" | "lecturer";
+  username: string;
+  name: string;
+  studentId?: string;
+  department?: string | null;
+  year?: number | null;
+  faceData?: string | null;
+}
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    // Tell Express that our user will have these properties
+    interface User extends UserWithRole {}
   }
 }
 

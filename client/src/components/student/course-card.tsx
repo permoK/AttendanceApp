@@ -3,6 +3,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Course } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CourseCardProps {
   course: Course;
@@ -18,6 +20,8 @@ export function StudentCourseCard({
   onMarkAttendance
 }: CourseCardProps) {
   const { id, code, name, department, isActive } = course;
+  const { user } = useAuth();
+  const hasFaceData = user?.faceData !== null && user?.faceData !== undefined;
   
   return (
     <Card className="overflow-hidden">
@@ -56,13 +60,27 @@ export function StudentCourseCard({
           </span>
           <div className="flex space-x-2">
             {isActive && onMarkAttendance && (
-              <Button 
-                size="sm" 
-                onClick={() => onMarkAttendance(id)} 
-                className="bg-amber-500 hover:bg-amber-600"
-              >
-                Mark Attendance
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => onMarkAttendance(id)} 
+                        className="bg-amber-500 hover:bg-amber-600"
+                        disabled={!hasFaceData}
+                      >
+                        Mark Attendance
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {!hasFaceData && (
+                    <TooltipContent>
+                      <p>Face verification required before marking attendance</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             )}
             <Button 
               variant="outline" 

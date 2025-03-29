@@ -30,12 +30,25 @@ export default function StudentDashboard() {
   // Fetch active courses
   const { 
     data: activeCourses = [], 
-    isLoading: isLoadingActiveCourses 
+    isLoading: isLoadingActiveCourses,
+    error: activeCoursesError 
   } = useQuery<Course[]>({
     queryKey: ['/api/active-courses'],
     enabled: !!user,
     refetchInterval: 30000, // Refetch every 30 seconds to check for newly activated courses
   });
+  
+  // Check if the student needs to register face data
+  const needsFaceRegistration = activeCoursesError?.message === "Face verification required";
+  
+  // If the student hasn't registered their face data yet, show a modal
+  const [showFaceRegistrationModal, setShowFaceRegistrationModal] = useState(false);
+  
+  useEffect(() => {
+    if (needsFaceRegistration && user) {
+      setShowFaceRegistrationModal(true);
+    }
+  }, [needsFaceRegistration, user]);
   
   // Fetch attendance records
   const { 
@@ -127,6 +140,26 @@ export default function StudentDashboard() {
             Logout
           </Button>
         </div>
+        
+        {/* Face Registration Alert */}
+        {!user?.faceData && (
+          <Alert className="mb-6 border-red-500 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-500" />
+            <AlertTitle className="text-red-500">Face verification required</AlertTitle>
+            <AlertDescription>
+              <p className="text-red-600 mb-2">
+                You need to complete face verification before you can mark attendance for your courses.
+              </p>
+              <Button 
+                size="sm" 
+                className="bg-red-500 hover:bg-red-600 text-white"
+                onClick={() => setShowFaceRegistrationModal(true)}
+              >
+                Register Now
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Active Class Alert */}
         {activeCourses.length > 0 && (
@@ -218,7 +251,7 @@ export default function StudentDashboard() {
         </div>
       </main>
       
-      {/* Face Recognition Modal */}
+      {/* Face Recognition Modal for attendance */}
       {selectedCourse && (
         <FaceRecognitionModal
           isOpen={isFaceRecognitionOpen}
@@ -226,6 +259,26 @@ export default function StudentDashboard() {
           onSuccess={handleAttendanceSuccess}
           user={user!}
           courseId={selectedCourse.id}
+        />
+      )}
+      
+      {/* Face Registration Modal */}
+      {user && (
+        <FaceRecognitionModal
+          isOpen={showFaceRegistrationModal}
+          onClose={() => setShowFaceRegistrationModal(false)}
+          onSuccess={() => {
+            setShowFaceRegistrationModal(false);
+            // Refresh user data and active courses
+            queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/active-courses'] });
+            toast({
+              title: "Face registered successfully",
+              description: "You can now mark attendance for your courses",
+            });
+          }}
+          user={user}
+          courseId={-1} // Use a placeholder value since we're just registering the face
         />
       )}
     </div>

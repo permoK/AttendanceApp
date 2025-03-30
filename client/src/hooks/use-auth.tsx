@@ -43,6 +43,8 @@ function useLoginMutation() {
         setLocation("/student");
       } else if (user.role === "lecturer") {
         setLocation("/lecturer");
+      } else if (user.role === "admin") {
+        setLocation("/admin");
       }
       
       toast({
@@ -77,6 +79,8 @@ function useRegisterMutation() {
         setLocation("/student");
       } else if (user.role === "lecturer") {
         setLocation("/lecturer");
+      } else if (user.role === "admin") {
+        setLocation("/admin");
       }
       
       toast({

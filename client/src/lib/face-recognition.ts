@@ -8,13 +8,20 @@ let modelsLoaded = false;
 export async function loadModels() {
   if (modelsLoaded) return;
   
-  await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-  ]);
-  
-  modelsLoaded = true;
+  console.log('Loading face recognition models...');
+  try {
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+    ]);
+    
+    modelsLoaded = true;
+    console.log('Face recognition models loaded successfully');
+  } catch (error) {
+    console.error('Error loading face recognition models:', error);
+    throw new Error('Failed to load face recognition models. Please refresh and try again.');
+  }
 }
 
 export async function detectFace(videoEl: HTMLVideoElement): Promise<faceapi.TinyFaceDetectorOptions> {
@@ -61,7 +68,14 @@ export async function captureFaceData(videoEl: HTMLVideoElement): Promise<string
 }
 
 export async function saveFaceData(faceData: string): Promise<void> {
-  await apiRequest('POST', '/api/save-face-data', { faceData });
+  console.log('Saving face data...');
+  try {
+    await apiRequest('POST', '/api/face-data', { faceData });
+    console.log('Face data saved successfully');
+  } catch (error) {
+    console.error('Error saving face data:', error);
+    throw new Error('Failed to save face data: ' + (error as Error).message);
+  }
 }
 
 export async function compareFaceWithStored(
@@ -75,7 +89,9 @@ export async function compareFaceWithStored(
     const distance = faceapi.euclideanDistance(liveDescriptor, storedDescriptor);
     
     // Threshold for face matching (lower is more strict)
-    const THRESHOLD = 0.5;
+    // Using a slightly more lenient threshold for better user experience
+    const THRESHOLD = 0.6;
+    console.log('Face comparison distance:', distance, 'Threshold:', THRESHOLD);
     return distance < THRESHOLD;
   } catch (error) {
     console.error('Face comparison error:', error);
@@ -88,16 +104,29 @@ export async function setupWebcam(videoEl: HTMLVideoElement): Promise<void> {
     throw new Error('Browser API navigator.mediaDevices.getUserMedia not available');
   }
   
-  videoEl.srcObject = await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: false
-  });
-  
-  return new Promise((resolve) => {
-    videoEl.onloadedmetadata = () => {
-      resolve();
-    };
-  });
+  try {
+    console.log('Requesting camera access...');
+    videoEl.srcObject = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: 'user'
+      },
+      audio: false
+    });
+    
+    console.log('Camera access granted');
+    
+    return new Promise((resolve) => {
+      videoEl.onloadedmetadata = () => {
+        console.log('Video element ready');
+        resolve();
+      };
+    });
+  } catch (error) {
+    console.error('Camera access error:', error);
+    throw new Error('Unable to access camera. Please ensure camera permissions are granted: ' + (error as Error).message);
+  }
 }
 
 export async function stopWebcam(videoEl: HTMLVideoElement): Promise<void> {

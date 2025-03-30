@@ -42,11 +42,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     if (req.user.role === "lecturer") {
+      // Lecturers see only their own courses
       const courses = await storage.getCoursesByLecturer(req.user.id);
       return res.json(courses);
     } else {
-      const courses = await storage.getStudentCourses(req.user.id);
-      return res.json(courses);
+      // For students, we need to filter by:
+      // 1. Courses they're enrolled in (from student_courses table)
+      // 2. Courses in their department and year
+      
+      // Get the student's details first
+      const student = await storage.getUser(req.user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Check if student has completed face verification
+      if (!student.faceData) {
+        return res.status(403).json({ 
+          message: "Face verification required", 
+          requiresFaceRegistration: true 
+        });
+      }
+      
+      // Get courses the student is enrolled in
+      const enrolledCourses = await storage.getStudentCourses(req.user.id);
+      
+      // Get all courses to filter
+      const allCourses = await storage.getAllCourses();
+      
+      // Filter courses by enrollment OR (department AND year)
+      const enrolledCourseIds = enrolledCourses.map(course => course.id);
+      const relevantCourses = allCourses.filter(course => 
+        enrolledCourseIds.includes(course.id) || 
+        (course.department === student.department && course.year === student.year)
+      );
+      
+      return res.json(relevantCourses);
     }
   });
   

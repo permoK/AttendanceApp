@@ -8,15 +8,17 @@ import { storage } from "./storage";
 import { User } from "@shared/schema";
 
 // Define the user interface with properties needed in Express
-interface UserWithRole extends User {
+interface UserWithRole {
   id: number;
-  role: "student" | "lecturer";
+  role: "student" | "lecturer" | "admin";
   username: string;
+  email: string;
+  password: string;
   name: string;
-  studentId?: string;
-  department?: string | null;
-  year?: number | null;
-  faceData?: string | null;
+  studentId: string;
+  department: string | null;
+  year: number | null;
+  faceData: string | null;
 }
 
 declare global {
@@ -60,9 +62,16 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username);
+        // Try to find user by username first
+        let user = await storage.getUserByUsername(username);
+        
+        // If not found by username, try email
+        if (!user) {
+          user = await storage.getUserByEmail(username);
+        }
+        
         if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false, { message: "Invalid username or password" });
+          return done(null, false, { message: "Invalid username/email or password" });
         }
         return done(null, user);
       } catch (err) {
@@ -83,16 +92,26 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const { username, password, name, role, studentId, department, year } = req.body;
+      const { username, email, password, name, role, studentId, department, year } = req.body;
       
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
+      // Check if username exists
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
         return res.status(400).json({ message: "Username already exists" });
+      }
+      
+      // Check if email exists
+      if (email) {
+        const existingEmail = await storage.getUserByEmail(email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
       }
 
       const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         username,
+        email: email || `${username}@university.edu`, // Better default domain
         password: hashedPassword,
         name,
         role,
@@ -115,25 +134,37 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    // Extract identifier (username or email) and role from request
+    const { identifier, password, role } = req.body;
+    
+    // Create a request-like object with username field expected by LocalStrategy
+    const authReq = {
+      ...req,
+      body: {
+        ...req.body,
+        username: identifier, // Map the identifier to username for LocalStrategy
+      }
+    };
+    
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
       
       // Check if the role matches
-      if (user.role !== req.body.role) {
-        return res.status(401).json({ message: `Invalid login. You are not a ${req.body.role}` });
+      if (user.role !== role) {
+        return res.status(401).json({ message: `Invalid login. You are not a ${role}` });
       }
       
-      req.login(user, (err) => {
+      req.login(user, (err: any) => {
         if (err) return next(err);
         
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
         return res.json(userWithoutPassword);
       });
-    })(req, res, next);
+    })(authReq, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {

@@ -38,7 +38,11 @@ function Router() {
     return (
       <Switch>
         <Route path="/">
-          <Redirect to={user.role === "student" ? "/student" : "/lecturer"} />
+          <Redirect to={
+            user.role === "student" ? "/student" : 
+            user.role === "lecturer" ? "/lecturer" : 
+            "/admin"
+          } />
         </Route>
       </Switch>
     );
@@ -60,6 +64,20 @@ function Router() {
         path="/lecturer" 
         component={LecturerDashboard}
         allowedRole="lecturer"
+      />
+      
+      {/* Admin routes */}
+      <ProtectedRoute 
+        path="/admin" 
+        component={() => {
+          const AdminDashboard = lazy(() => import("@/pages/admin-dashboard"));
+          return (
+            <Suspense fallback={<PageLoader />}>
+              <AdminDashboard />
+            </Suspense>
+          );
+        }}
+        allowedRole="admin"
       />
       
       {/* Common routes with role-based access */}
@@ -96,7 +114,11 @@ function Router() {
       {/* Home route - redirect to auth if not logged in */}
       <Route path="/">
         {user ? (
-          <Redirect to={user.role === "student" ? "/student" : "/lecturer"} />
+          <Redirect to={
+            user.role === "student" ? "/student" : 
+            user.role === "lecturer" ? "/lecturer" : 
+            "/admin"
+          } />
         ) : (
           <AuthPage />
         )}

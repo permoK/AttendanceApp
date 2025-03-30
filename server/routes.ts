@@ -8,7 +8,10 @@ import {
   insertCourseSchema, 
   activateCourseSchema, 
   insertStudentCourseSchema, 
-  insertAttendanceSchema 
+  insertAttendanceSchema,
+  insertDepartmentSchema,
+  insertProgramSchema,
+  insertUserSchema
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 

@@ -33,9 +33,9 @@ import { loadModels, setupWebcam, stopWebcam, captureFaceData } from '@/lib/face
 import { apiRequest } from '@/lib/queryClient';
 
 const loginFormSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  identifier: z.string().min(1, 'Username or email is required'),
   password: z.string().min(1, 'Password is required'),
-  role: z.enum(['student', 'lecturer']),
+  role: z.enum(['student', 'lecturer', 'admin']),
 });
 
 const registerFormSchema = insertUserSchema.extend({
@@ -70,7 +70,7 @@ export function AuthTabs() {
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      username: '',
+      identifier: '',
       password: '',
       role: 'student',
     },
@@ -215,6 +215,7 @@ export function AuthTabs() {
                         <SelectContent>
                           <SelectItem value="student">Student</SelectItem>
                           <SelectItem value="lecturer">Lecturer</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -224,12 +225,12 @@ export function AuthTabs() {
                 
                 <FormField
                   control={loginForm.control}
-                  name="username"
+                  name="identifier"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>Username or Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your username" {...field} />
+                        <Input placeholder="Enter your username or email" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

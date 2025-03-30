@@ -76,8 +76,22 @@ export class DatabaseStorage implements IStorage {
     // Add lecturers
     const hashedPassword = await hashPassword('password');
     
+    // Add admin user
+    const [admin] = await db.insert(users).values({
+      username: "admin",
+      email: "admin@university.edu",
+      password: hashedPassword,
+      name: "System Administrator",
+      role: "admin",
+      studentId: "",
+      department: null,
+      year: null,
+      faceData: null
+    }).returning();
+    
     const [lecturer1] = await db.insert(users).values({
       username: "lecturer",
+      email: "sarah.johnson@university.edu",
       password: hashedPassword,
       name: "Dr. Sarah Johnson",
       role: "lecturer",
@@ -89,6 +103,7 @@ export class DatabaseStorage implements IStorage {
     
     const [lecturer2] = await db.insert(users).values({
       username: "profsmith",
+      email: "john.smith@university.edu",
       password: hashedPassword,
       name: "Prof. John Smith",
       role: "lecturer",
@@ -101,6 +116,7 @@ export class DatabaseStorage implements IStorage {
     // Add students
     const [student1] = await db.insert(users).values({
       username: "student",
+      email: "john.s@university.edu",
       password: hashedPassword,
       name: "John Smith",
       role: "student",
@@ -112,6 +128,7 @@ export class DatabaseStorage implements IStorage {
     
     const [student2] = await db.insert(users).values({
       username: "alice",
+      email: "alice.j@university.edu",
       password: hashedPassword,
       name: "Alice Johnson",
       role: "student",
@@ -123,6 +140,7 @@ export class DatabaseStorage implements IStorage {
     
     const [student3] = await db.insert(users).values({
       username: "bob",
+      email: "bob.w@university.edu",
       password: hashedPassword,
       name: "Bob Williams",
       role: "student",
@@ -197,6 +215,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+  
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
 

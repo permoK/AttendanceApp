@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route } from "wouter";
 
-type Role = "student" | "lecturer";
+type Role = "student" | "lecturer" | "admin";
 
 type ProtectedRouteProps = {
   path: string;
@@ -30,7 +30,11 @@ export function ProtectedRoute({
       ) : !user ? (
         <Redirect to="/auth" />
       ) : allowedRole && user.role !== allowedRole ? (
-        <Redirect to={user.role === "student" ? "/student" : "/lecturer"} />
+        <Redirect to={
+          user.role === "student" ? "/student" : 
+          user.role === "lecturer" ? "/lecturer" : 
+          "/admin"
+        } />
       ) : Component ? (
         <Component />
       ) : (

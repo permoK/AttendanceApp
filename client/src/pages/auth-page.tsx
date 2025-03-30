@@ -14,6 +14,8 @@ export default function AuthPage() {
         setLocation("/student");
       } else if (user.role === "lecturer") {
         setLocation("/lecturer");
+      } else if (user.role === "admin") {
+        setLocation("/admin");
       }
     }
   }, [user, isLoading, setLocation]);

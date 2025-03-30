@@ -2,7 +2,7 @@ import {
   users, type User, type InsertUser,
   courses, type Course, type InsertCourse,
   studentCourses, type StudentCourse, type InsertStudentCourse,
-  attendance, type Attendance, type InsertAttendance
+  attendance as attendanceTable, type Attendance, type InsertAttendance
 } from "@shared/schema";
 import session from "express-session";
 import { db } from "./db";
@@ -324,35 +324,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markAttendance(insertAttendance: InsertAttendance): Promise<Attendance> {
-    const [attendance] = await db.insert(attendance)
+    const [attendanceRecord] = await db.insert(attendanceTable)
       .values(insertAttendance)
       .returning();
     
-    return attendance;
+    return attendanceRecord;
   }
 
   async getAttendanceByStudent(studentId: number): Promise<Attendance[]> {
     return await db.select()
-      .from(attendance)
-      .where(eq(attendance.studentId, studentId))
-      .orderBy(desc(attendance.timestamp));
+      .from(attendanceTable)
+      .where(eq(attendanceTable.studentId, studentId))
+      .orderBy(desc(attendanceTable.timestamp));
   }
 
   async getAttendanceByStudentAndCourse(studentId: number, courseId: number): Promise<Attendance[]> {
     return await db.select()
-      .from(attendance)
+      .from(attendanceTable)
       .where(and(
-        eq(attendance.studentId, studentId),
-        eq(attendance.courseId, courseId)
+        eq(attendanceTable.studentId, studentId),
+        eq(attendanceTable.courseId, courseId)
       ))
-      .orderBy(desc(attendance.timestamp));
+      .orderBy(desc(attendanceTable.timestamp));
   }
 
   async getAttendanceByCourse(courseId: number): Promise<Attendance[]> {
     return await db.select()
-      .from(attendance)
-      .where(eq(attendance.courseId, courseId))
-      .orderBy(desc(attendance.timestamp));
+      .from(attendanceTable)
+      .where(eq(attendanceTable.courseId, courseId))
+      .orderBy(desc(attendanceTable.timestamp));
   }
 
   async getAttendanceByCourseAndDate(courseId: number, date: Date): Promise<Attendance[]> {
@@ -363,12 +363,12 @@ export class DatabaseStorage implements IStorage {
     endOfDay.setHours(23, 59, 59, 999);
     
     return await db.select()
-      .from(attendance)
+      .from(attendanceTable)
       .where(and(
-        eq(attendance.courseId, courseId),
-        between(attendance.timestamp, startOfDay, endOfDay)
+        eq(attendanceTable.courseId, courseId),
+        between(attendanceTable.timestamp, startOfDay, endOfDay)
       ))
-      .orderBy(desc(attendance.timestamp));
+      .orderBy(desc(attendanceTable.timestamp));
   }
 }
 

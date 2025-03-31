@@ -28,18 +28,34 @@ interface AddCourseModalProps {
 const courseFormSchema = insertCourseSchema.pick({
   code: true,
   name: true,
-  department: true,
+  departmentId: true,
+  schoolId: true,
+  programId: true,
   year: true,
   schedule: true,
 });
 
 export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSchool, setSelectedSchool] = useState<number | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const { toast } = useToast();
   
+  // Fetch schools
+  const { data: schools = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['/api/schools'],
+  });
+  
   // Fetch departments
-  const { data: departments = [] } = useQuery<string[]>({
+  const { data: departments = [] } = useQuery<{ id: number; name: string; schoolId: number }[]>({
     queryKey: ['/api/departments'],
+    enabled: !!selectedSchool,
+  });
+  
+  // Fetch programs
+  const { data: programs = [] } = useQuery<{ id: number; name: string; departmentId: number }[]>({
+    queryKey: ['/api/programs'],
+    enabled: !!selectedDepartment,
   });
   
   // Create form
@@ -48,12 +64,32 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
     defaultValues: {
       code: '',
       name: '',
-      department: '',
+      schoolId: undefined,
+      departmentId: undefined,
+      programId: undefined,
       year: undefined,
       schedule: '',
     },
   });
-  
+
+  // Handle school selection
+  const handleSchoolSelect = (value: string) => {
+    const schoolId = parseInt(value);
+    setSelectedSchool(schoolId);
+    setSelectedDepartment(null);
+    form.setValue('schoolId', schoolId);
+    form.setValue('departmentId', undefined);
+    form.setValue('programId', undefined);
+  };
+
+  // Handle department selection
+  const handleDepartmentSelect = (value: string) => {
+    const departmentId = parseInt(value);
+    setSelectedDepartment(departmentId);
+    form.setValue('departmentId', departmentId);
+    form.setValue('programId', undefined);
+  };
+
   async function onSubmit(values: z.infer<typeof courseFormSchema>) {
     try {
       setIsSubmitting(true);
@@ -71,6 +107,7 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
       form.reset();
       onClose();
     } catch (error) {
+      console.log("Error: ", error)
       toast({
         title: 'Course creation failed',
         description: error instanceof Error ? error.message : 'Failed to create course',
@@ -120,20 +157,23 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
             
             <FormField
               control={form.control}
-              name="department"
+              name="schoolId" 
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Department</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <FormLabel>School</FormLabel>
+                  <Select 
+                    onValueChange={handleSchoolSelect} 
+                    value={field.value?.toString()}
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select Department" />
+                        <SelectValue placeholder="Select School" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
+                      {schools.map((school) => (
+                        <SelectItem key={school.id} value={school.id.toString()}>
+                          {school.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -142,6 +182,70 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
                 </FormItem>
               )}
             />
+            
+            {selectedSchool && (
+              <FormField
+                control={form.control}
+                name="departmentId" 
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department</FormLabel>
+                    <Select 
+                      onValueChange={handleDepartmentSelect} 
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {departments
+                          .filter(dept => dept.schoolId === selectedSchool)
+                          .map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id.toString()}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            {selectedDepartment && (
+              <FormField
+                control={form.control}
+                name="programId" 
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Program</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} 
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Program" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {programs
+                          .filter(prog => prog.departmentId === selectedDepartment)
+                          .map((prog) => (
+                            <SelectItem key={prog.id} value={prog.id.toString()}>
+                              {prog.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             
             <FormField
               control={form.control}

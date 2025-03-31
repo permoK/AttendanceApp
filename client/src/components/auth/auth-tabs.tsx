@@ -3,13 +3,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,7 +19,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserCheck, Camera, Check, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -67,34 +67,34 @@ export function AuthTabs() {
   const [selectedSchool, setSelectedSchool] = useState<number | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const [selectedProgram, setSelectedProgram] = useState<number | null>(null);
-  
+
   // Fetch schools for dropdown
   const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
     queryKey: ["/api/schools"],
     enabled: true,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
-  
+
   // Fetch departments for dropdown
   const { data: departments = [], isLoading: isLoadingDepartments } = useQuery<Department[]>({
     queryKey: ["/api/departments"],
     enabled: true,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
-  
+
   // Fetch programs for dropdown
   const { data: programs = [], isLoading: isLoadingPrograms } = useQuery<Program[]>({
     queryKey: ['/api/programs'],
     enabled: !!selectedDepartment, // Only fetch when a department is selected
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
-  
+
   // Fetch all courses for potential enrollment
   const { data: allCourses = [] } = useQuery<any[]>({
     queryKey: ['/api/all-courses'],
     enabled: showFaceVerification, // Only fetch when we need to show courses
   });
-  
+
   // Login form
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     resolver: zodResolver(loginFormSchema),
@@ -104,7 +104,7 @@ export function AuthTabs() {
       role: 'student',
     },
   });
-  
+
   // Register form
   const registerForm = useForm<z.infer<typeof registerFormSchema>>({
     resolver: zodResolver(registerFormSchema),
@@ -123,16 +123,27 @@ export function AuthTabs() {
       faceData: null,
     },
   });
-  
+
   // Handle login submission
   function onLoginSubmit(values: z.infer<typeof loginFormSchema>) {
     loginMutation.mutate(values);
   }
-  
+
   // Handle register submission
   function onRegisterSubmit(values: z.infer<typeof registerFormSchema>) {
     const { confirmPassword, ...userData } = values;
-    registerMutation.mutate(userData as any, {
+    console.log("Registration User data: ", userData);
+
+    // Ensure numeric fields are properly typed
+    const formattedData = {
+      ...userData,
+      schoolId: userData.schoolId ? Number(userData.schoolId) : undefined,
+      departmentId: userData.departmentId ? Number(userData.departmentId) : undefined,
+      programId: userData.programId ? Number(userData.programId) : undefined,
+      year: userData.year ? Number(userData.year) : undefined
+    };
+
+    registerMutation.mutate(formattedData as any, {
       onSuccess: (user) => {
         if (user.role === 'student') {
           setRegisteredUser(user);
@@ -141,7 +152,7 @@ export function AuthTabs() {
       }
     });
   }
-  
+
   // Initialize face recognition
   useEffect(() => {
     if (showFaceVerification) {
@@ -156,9 +167,9 @@ export function AuthTabs() {
           setFaceVerificationStatus('error');
         }
       };
-      
+
       initFaceRecognition();
-      
+
       return () => {
         if (videoRef.current) {
           stopWebcam(videoRef.current);
@@ -166,23 +177,23 @@ export function AuthTabs() {
       };
     }
   }, [showFaceVerification]);
-  
+
   // Handle face capturing and registration
   async function captureAndRegisterFace() {
     if (!videoRef.current || !registeredUser) return;
-    
+
     try {
       setFaceVerificationStatus('registering');
       const faceData = await captureFaceData(videoRef.current);
-      
+
       // Save face data to server
       const response = await apiRequest('POST', '/api/face-data', {
         faceData
       });
-      
+
       if (response.ok) {
         setFaceVerificationStatus('success');
-        
+
         // Handle course enrollment if courses were selected
         if (selectedCourses.length > 0) {
           for (const courseId of selectedCourses) {
@@ -199,7 +210,7 @@ export function AuthTabs() {
       setFaceVerificationStatus('error');
     }
   }
-  
+
   // Close modal and reset
   function handleCloseVerification() {
     setShowFaceVerification(false);
@@ -207,10 +218,10 @@ export function AuthTabs() {
     setSelectedCourses([]);
     setRegisteredUser(null);
   }
-  
+
   // Switch form based on role selection in register form
   const watchedRole = registerForm.watch('role');
-  
+
   // Handle school selection
   const handleSchoolSelect = (value: string) => {
     const schoolId = parseInt(value);
@@ -221,7 +232,7 @@ export function AuthTabs() {
     registerForm.setValue('departmentId', undefined);
     registerForm.setValue('programId', undefined);
   };
-  
+
   // Handle department selection
   const handleDepartmentSelect = (value: string) => {
     const departmentId = parseInt(value);
@@ -230,7 +241,7 @@ export function AuthTabs() {
     registerForm.setValue('departmentId', departmentId);
     registerForm.setValue('programId', undefined);
   };
-  
+
   // Handle program selection
   const handleProgramSelect = (value: string) => {
     const programId = parseInt(value);
@@ -249,13 +260,13 @@ export function AuthTabs() {
           </div>
           <p className="text-sm opacity-80">Facial Recognition Attendance System</p>
         </div>
-        
+
         <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-2 w-full">
             <TabsTrigger value="login" className="py-3">Student/Lecturer Login</TabsTrigger>
             <TabsTrigger value="register" className="py-3">Register</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="login" className="p-6">
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
@@ -281,7 +292,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={loginForm.control}
                   name="identifier"
@@ -295,7 +306,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={loginForm.control}
                   name="password"
@@ -309,14 +320,14 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
                   {loginMutation.isPending ? "Logging in..." : "Login"}
                 </Button>
               </form>
             </Form>
           </TabsContent>
-          
+
           <TabsContent value="register" className="p-6">
             <Form {...registerForm}>
               <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
@@ -333,7 +344,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={registerForm.control}
                   name="username"
@@ -347,7 +358,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={registerForm.control}
                   name="email"
@@ -361,7 +372,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={registerForm.control}
                   name="password"
@@ -375,7 +386,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={registerForm.control}
                   name="confirmPassword"
@@ -389,7 +400,7 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={registerForm.control}
                   name="role"
@@ -411,7 +422,36 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
-                
+
+                <FormField
+                  control={registerForm.control}
+                  name="schoolId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School *</FormLabel>
+                      <Select
+                        onValueChange={handleSchoolSelect}
+                        value={field.value?.toString()}
+                        disabled={isLoadingSchools}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={isLoadingSchools ? "Loading schools..." : "Select your school"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {schools.map((school) => (
+                            <SelectItem key={school.id} value={school.id.toString()}>
+                              {school.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {watchedRole === 'student' && (
                   <>
                     <FormField
@@ -427,36 +467,8 @@ export function AuthTabs() {
                         </FormItem>
                       )}
                     />
-                    
-                    <FormField
-                      control={registerForm.control}
-                      name="schoolId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>School *</FormLabel>
-                          <Select 
-                            onValueChange={handleSchoolSelect} 
-                            value={field.value?.toString()}
-                            disabled={isLoadingSchools}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={isLoadingSchools ? "Loading schools..." : "Select your school"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {schools.map((school) => (
-                                <SelectItem key={school.id} value={school.id.toString()}>
-                                  {school.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
+
+
                     {selectedSchool && (
                       <FormField
                         control={registerForm.control}
@@ -464,8 +476,8 @@ export function AuthTabs() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Department *</FormLabel>
-                            <Select 
-                              onValueChange={handleDepartmentSelect} 
+                            <Select
+                              onValueChange={handleDepartmentSelect}
                               value={field.value?.toString()}
                               disabled={isLoadingDepartments}
                             >
@@ -489,7 +501,7 @@ export function AuthTabs() {
                         )}
                       />
                     )}
-                    
+
                     {selectedDepartment && (
                       <FormField
                         control={registerForm.control}
@@ -497,8 +509,8 @@ export function AuthTabs() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Program *</FormLabel>
-                            <Select 
-                              onValueChange={handleProgramSelect} 
+                            <Select
+                              onValueChange={handleProgramSelect}
                               value={field.value?.toString()}
                               disabled={isLoadingPrograms}
                             >
@@ -522,7 +534,7 @@ export function AuthTabs() {
                         )}
                       />
                     )}
-                    
+
                     <FormField
                       control={registerForm.control}
                       name="year"
@@ -548,71 +560,46 @@ export function AuthTabs() {
                     />
                   </>
                 )}
-                
+
                 {watchedRole === 'lecturer' && (
                   <>
+
+
                     <FormField
                       control={registerForm.control}
-                      name="schoolId"
+                      name="departmentId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>School *</FormLabel>
-                          <Select onValueChange={(value) => {
-                            field.onChange(parseInt(value));
-                            registerForm.setValue('departmentId', undefined);
-                          }} value={field.value?.toString()}>
+                          <FormLabel>Department *</FormLabel>
+                          <Select
+                            onValueChange={handleDepartmentSelect}
+                            value={field.value?.toString()}
+                            disabled={isLoadingDepartments}
+                          >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select your school" />
+                                <SelectValue placeholder={isLoadingDepartments ? "Loading departments..." : "Select your department"} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {schools.map((school) => (
-                                <SelectItem key={school.id} value={school.id.toString()}>
-                                  {school.name}
-                                </SelectItem>
-                              ))}
+                              {departments
+                                .filter(dept => dept.schoolId === selectedSchool)
+                                .map((dept) => (
+                                  <SelectItem key={dept.id} value={dept.id.toString()}>
+                                    {dept.name}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    
-                    {selectedSchool && (
-                      <FormField
-                        control={registerForm.control}
-                        name="departmentId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Department *</FormLabel>
-                            <Select onValueChange={(value) => {
-                              field.onChange(parseInt(value));
-                              registerForm.setValue('programId', undefined);
-                            }} value={field.value?.toString()}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select your department" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {departments
-                                  .filter(dept => dept.schoolId === selectedSchool)
-                                  .map((dept) => (
-                                    <SelectItem key={dept.id} value={dept.id.toString()}>
-                                      {dept.name}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
+
+
                   </>
                 )}
-                
+
                 <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
                   {registerMutation.isPending ? "Registering..." : "Register"}
                 </Button>
@@ -621,11 +608,11 @@ export function AuthTabs() {
           </TabsContent>
         </Tabs>
       </div>
-      
+
       <div className="mt-6 text-center text-sm text-gray-600">
         <p>Only users connected to the school network can access this system.</p>
       </div>
-      
+
       {/* Face Verification Dialog */}
       <Dialog open={showFaceVerification} onOpenChange={setShowFaceVerification}>
         <DialogContent className="sm:max-w-md">
@@ -638,7 +625,7 @@ export function AuthTabs() {
               {faceVerificationStatus === 'registering' && "Processing... Please wait."}
             </DialogDescription>
           </DialogHeader>
-          
+
           {faceVerificationStatus === 'initial' && (
             <div className="flex flex-col space-y-4">
               <div className="relative bg-muted rounded-md overflow-hidden w-full h-64 mx-auto">
@@ -652,7 +639,7 @@ export function AuthTabs() {
                   <div className="rounded-full w-52 h-52 border-2 border-dashed border-primary opacity-70" />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <h3 className="text-sm font-medium">Select courses to enroll in (optional):</h3>
                 <MultiSelect
@@ -665,8 +652,8 @@ export function AuthTabs() {
                   placeholder="Select courses..."
                 />
               </div>
-              
-              <Button 
+
+              <Button
                 onClick={captureAndRegisterFace}
                 className="w-full"
               >
@@ -674,22 +661,22 @@ export function AuthTabs() {
               </Button>
             </div>
           )}
-          
+
           {faceVerificationStatus === 'success' && (
             <div className="flex flex-col items-center justify-center py-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <Check className="w-8 h-8 text-green-600" />
               </div>
               <p className="text-center">Your face has been registered successfully.</p>
-              <Button 
-                className="mt-4" 
+              <Button
+                className="mt-4"
                 onClick={handleCloseVerification}
               >
                 Continue to Dashboard
               </Button>
             </div>
           )}
-          
+
           {faceVerificationStatus === 'error' && (
             <div className="flex flex-col items-center justify-center py-4">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -697,13 +684,13 @@ export function AuthTabs() {
               </div>
               <p className="text-center">There was an error registering your face. Please try again.</p>
               <div className="flex space-x-2 mt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCloseVerification}
                 >
                   Skip for now
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setFaceVerificationStatus('initial')}
                 >
                   Try Again
@@ -711,7 +698,7 @@ export function AuthTabs() {
               </div>
             </div>
           )}
-          
+
           {faceVerificationStatus === 'registering' && (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="flex items-center space-x-2">

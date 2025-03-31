@@ -111,7 +111,7 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const { username, email, password, name, role, studentId, department, year } = req.body;
+      const { username, email, password, name, role, studentId, schoolId, departmentId, programId, year } = req.body;
       
       // Check if username exists
       const existingUsername = await storage.getUserByUsername(username);
@@ -135,7 +135,9 @@ export function setupAuth(app: Express) {
         name,
         role,
         studentId: studentId || "",
-        department,
+        schoolId,
+        departmentId,
+        programId,
         year,
         faceData: null
       });

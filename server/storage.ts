@@ -300,7 +300,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCoursesByLecturer(lecturerId: number): Promise<Course[]> {
-    return await db.select().from(courses).where(eq(courses.lecturerId, lecturerId));
+    return await db
+      .select({
+        id: courses.id,
+        code: courses.code,
+        name: courses.name,
+        schoolId: courses.schoolId,
+        departmentId: courses.departmentId,
+        programId: courses.programId,
+        year: courses.year,
+        lecturerId: courses.lecturerId,
+        schedule: courses.schedule,
+        isActive: courses.isActive,
+        activatedAt: courses.activatedAt,
+        department: departments.name
+      })
+      .from(courses)
+      .leftJoin(departments, eq(courses.departmentId, departments.id))
+      .where(eq(courses.lecturerId, lecturerId));
   }
 
   async getActiveCourses(): Promise<Course[]> {

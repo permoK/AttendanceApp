@@ -38,11 +38,22 @@ const loginFormSchema = z.object({
   role: z.enum(['student', 'lecturer', 'admin']),
 });
 
-const registerFormSchema = insertUserSchema.extend({
-  confirmPassword: z.string().min(1, 'Confirm Password is required'),
-}).refine(data => data.password === data.confirmPassword, {
+const registerFormSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+  role: z.enum(["student", "lecturer"]),
+  studentId: z.string().optional(),
+  schoolId: z.number().optional(),
+  departmentId: z.number().optional(),
+  programId: z.number().optional(),
+  year: z.number().optional(),
+  faceData: z.any().optional()
+}).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
-  path: ['confirmPassword'],
+  path: ["confirmPassword"],
 });
 
 export function AuthTabs() {
@@ -53,11 +64,29 @@ export function AuthTabs() {
   const [registeredUser, setRegisteredUser] = useState<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { loginMutation, registerMutation } = useAuth();
+  const [selectedSchool, setSelectedSchool] = useState<number | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+  const [selectedProgram, setSelectedProgram] = useState<number | null>(null);
+  
+  // Fetch schools for dropdown
+  const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
+    queryKey: ["/api/schools"],
+    enabled: true,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
   
   // Fetch departments for dropdown
-  const { data: departments = [] } = useQuery<string[]>({
-    queryKey: ['/api/departments'],
-    staleTime: Infinity, // Departments won't change during a session
+  const { data: departments = [], isLoading: isLoadingDepartments } = useQuery<Department[]>({
+    queryKey: ["/api/departments"],
+    enabled: true,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+  
+  // Fetch programs for dropdown
+  const { data: programs = [] } = useQuery<any[]>({
+    queryKey: ['/api/programs'],
+    enabled: !!selectedDepartment, // Only fetch when a department is selected
+    staleTime: Infinity,
   });
   
   // Fetch all courses for potential enrollment
@@ -87,7 +116,9 @@ export function AuthTabs() {
       name: '',
       role: 'student',
       studentId: '',
-      department: '',
+      schoolId: undefined,
+      departmentId: undefined,
+      programId: undefined,
       year: undefined,
       faceData: null,
     },
@@ -179,6 +210,33 @@ export function AuthTabs() {
   
   // Switch form based on role selection in register form
   const watchedRole = registerForm.watch('role');
+  
+  // Handle school selection
+  const handleSchoolSelect = (value: string) => {
+    const schoolId = parseInt(value);
+    setSelectedSchool(schoolId);
+    setSelectedDepartment(null);
+    setSelectedProgram(null);
+    registerForm.setValue('schoolId', schoolId);
+    registerForm.setValue('departmentId', undefined);
+    registerForm.setValue('programId', undefined);
+  };
+  
+  // Handle department selection
+  const handleDepartmentSelect = (value: string) => {
+    const departmentId = parseInt(value);
+    setSelectedDepartment(departmentId);
+    setSelectedProgram(null);
+    registerForm.setValue('departmentId', departmentId);
+    registerForm.setValue('programId', undefined);
+  };
+  
+  // Handle program selection
+  const handleProgramSelect = (value: string) => {
+    const programId = parseInt(value);
+    setSelectedProgram(programId);
+    registerForm.setValue('programId', programId);
+  };
 
   return (
     <div className="w-full max-w-md">
@@ -264,28 +322,6 @@ export function AuthTabs() {
               <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
                 <FormField
                   control={registerForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="lecturer">Lecturer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={registerForm.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
@@ -326,78 +362,6 @@ export function AuthTabs() {
                   )}
                 />
                 
-                {watchedRole === 'student' && (
-                  <FormField
-                    control={registerForm.control}
-                    name="studentId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Student ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter your student ID" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                
-                <FormField
-                  control={registerForm.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value || ''}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                {watchedRole === 'student' && (
-                  <FormField
-                    control={registerForm.control}
-                    name="year"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Year</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(parseInt(value))} 
-                          value={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select your year" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="1">1st Year</SelectItem>
-                            <SelectItem value="2">2nd Year</SelectItem>
-                            <SelectItem value="3">3rd Year</SelectItem>
-                            <SelectItem value="4">4th Year</SelectItem>
-                            <SelectItem value="5">5th Year</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                
                 <FormField
                   control={registerForm.control}
                   name="password"
@@ -425,6 +389,225 @@ export function AuthTabs() {
                     </FormItem>
                   )}
                 />
+                
+                <FormField
+                  control={registerForm.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="student">Student</SelectItem>
+                          <SelectItem value="lecturer">Lecturer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                {watchedRole === 'student' && (
+                  <>
+                    <FormField
+                      control={registerForm.control}
+                      name="studentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Student ID</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter your student ID" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="schoolId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School *</FormLabel>
+                          <Select 
+                            onValueChange={handleSchoolSelect} 
+                            value={field.value?.toString()}
+                            disabled={isLoadingSchools}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={isLoadingSchools ? "Loading schools..." : "Select your school"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {schools.map((school) => (
+                                <SelectItem key={school.id} value={school.id.toString()}>
+                                  {school.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {selectedSchool && (
+                      <FormField
+                        control={registerForm.control}
+                        name="departmentId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Department *</FormLabel>
+                            <Select 
+                              onValueChange={handleDepartmentSelect} 
+                              value={field.value?.toString()}
+                              disabled={isLoadingDepartments}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={isLoadingDepartments ? "Loading departments..." : "Select your department"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {departments
+                                  .filter(dept => dept.schoolId === selectedSchool)
+                                  .map((dept) => (
+                                    <SelectItem key={dept.id} value={dept.id.toString()}>
+                                      {dept.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    
+                    {selectedDepartment && (
+                      <FormField
+                        control={registerForm.control}
+                        name="programId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Program *</FormLabel>
+                            <Select onValueChange={handleProgramSelect} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select your program" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {programs
+                                  .filter(prog => prog.departmentId === selectedDepartment)
+                                  .map((prog) => (
+                                    <SelectItem key={prog.id} value={prog.id.toString()}>
+                                      {prog.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="year"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Year of Study *</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your year" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="1">Year 1</SelectItem>
+                              <SelectItem value="2">Year 2</SelectItem>
+                              <SelectItem value="3">Year 3</SelectItem>
+                              <SelectItem value="4">Year 4</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+                
+                {watchedRole === 'lecturer' && (
+                  <>
+                    <FormField
+                      control={registerForm.control}
+                      name="schoolId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School *</FormLabel>
+                          <Select onValueChange={(value) => {
+                            field.onChange(parseInt(value));
+                            registerForm.setValue('departmentId', undefined);
+                          }} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select your school" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {schools.map((school) => (
+                                <SelectItem key={school.id} value={school.id.toString()}>
+                                  {school.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {selectedSchool && (
+                      <FormField
+                        control={registerForm.control}
+                        name="departmentId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Department *</FormLabel>
+                            <Select onValueChange={(value) => {
+                              field.onChange(parseInt(value));
+                              registerForm.setValue('programId', undefined);
+                            }} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select your department" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {departments
+                                  .filter(dept => dept.schoolId === selectedSchool)
+                                  .map((dept) => (
+                                    <SelectItem key={dept.id} value={dept.id.toString()}>
+                                      {dept.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </>
+                )}
                 
                 <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
                   {registerMutation.isPending ? "Registering..." : "Register"}

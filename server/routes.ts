@@ -11,9 +11,12 @@ import {
   insertAttendanceSchema,
   insertDepartmentSchema,
   insertProgramSchema,
-  insertUserSchema
+  insertUserSchema,
+  insertSchoolSchema
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import bcrypt from "bcrypt";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -22,12 +25,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply school network middleware to all routes
   app.use(schoolNetworkOnly);
   
-  // Get departments for registration and course creation
-  app.get("/api/departments", async (req, res) => {
-    const departments = await storage.getDepartments();
+  // School management routes
+  app.get("/api/schools", async (req, res) => {
+    try {
+      const schools = await storage.getSchools();
+      res.json(schools);
+    } catch (error) {
+      console.error("Error fetching schools:", error);
+      res.status(500).json({ error: "Failed to fetch schools" });
+    }
+  });
+
+  app.post("/api/schools", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const schoolData = insertSchoolSchema.parse(req.body);
+      const school = await storage.createSchool(schoolData);
+      res.status(201).json(school);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to create school" });
+    }
+  });
+
+  app.put("/api/schools/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const schoolData = insertSchoolSchema.parse(req.body);
+      const school = await storage.updateSchool(parseInt(id), schoolData);
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      res.json(school);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to update school" });
+    }
+  });
+
+  app.delete("/api/schools/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteSchool(parseInt(id));
+      if (!success) {
+        return res.status(404).json({ message: "School not found" });
+      }
+      res.sendStatus(204);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete school" });
+    }
+  });
+
+  // Get departments for a specific school
+  app.get("/api/schools/:schoolId/departments", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const { schoolId } = req.params;
+    const departments = await storage.getDepartmentsBySchool(parseInt(schoolId));
     return res.json(departments);
   });
   
+  // Get departments for registration and course creation
+  app.get("/api/departments", async (req, res) => {
+    try {
+      const departments = await storage.getDepartments();
+      res.json(departments);
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      res.status(500).json({ error: "Failed to fetch departments" });
+    }
+  });
+  
+  app.post("/api/departments", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const departmentData = insertDepartmentSchema.parse(req.body);
+      const department = await storage.createDepartment(departmentData);
+      res.status(201).json(department);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to create department" });
+    }
+  });
+
+  app.put("/api/departments/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const departmentData = insertDepartmentSchema.parse(req.body);
+      const department = await storage.updateDepartment(parseInt(id), departmentData);
+      if (!department) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.json(department);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to update department" });
+    }
+  });
+
+  app.delete("/api/departments/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteDepartment(parseInt(id));
+      if (!success) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.sendStatus(204);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete department" });
+    }
+  });
+
+  // Get courses for a specific department
+  app.get("/api/departments/:departmentId/courses", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    const { departmentId } = req.params;
+    const courses = await storage.getCoursesByDepartment(parseInt(departmentId));
+    return res.json(courses);
+  });
+
   // Get all courses (for enrollment)
   app.get("/api/all-courses", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -77,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const enrolledCourseIds = enrolledCourses.map(course => course.id);
       const relevantCourses = allCourses.filter(course => 
         enrolledCourseIds.includes(course.id) || 
-        (course.department === student.department && course.year === student.year)
+        (course.departmentId === student.departmentId && course.year === student.year)
       );
       
       return res.json(relevantCourses);
@@ -175,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filteredCourses = activeCourses.filter(course => 
         // Either enrolled in the course OR matches student's department and year
         enrolledCourseIds.includes(course.id) || 
-        (course.department === student.department && course.year === student.year)
+        (course.departmentId === student.departmentId && course.year === student.year)
       );
       
       return res.json(filteredCourses);
@@ -287,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const studentCourses = await storage.getStudentCourses(req.user.id);
       const isEnrolled = studentCourses.some(c => c.id === courseId);
       
-      if (!isEnrolled && (course.department !== student.department || course.year !== student.year)) {
+      if (!isEnrolled && (course.departmentId !== student.departmentId || course.year !== student.year)) {
         return res.status(403).json({ 
           message: "You are not enrolled in this course and it's not in your department/year" 
         });
@@ -394,6 +549,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const today = new Date();
     const attendance = await storage.getAttendanceByCourseAndDate(courseId, today);
     res.json(attendance);
+  });
+
+  // Program management routes
+  app.get("/api/programs", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    const programs = await storage.getAllPrograms();
+    return res.json(programs);
+  });
+
+  app.post("/api/programs", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const programData = insertProgramSchema.parse(req.body);
+      const program = await storage.createProgram(programData);
+      res.status(201).json(program);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to create program" });
+    }
+  });
+
+  app.put("/api/programs/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const programData = insertProgramSchema.parse(req.body);
+      const program = await storage.updateProgram(parseInt(id), programData);
+      if (!program) {
+        return res.status(404).json({ message: "Program not found" });
+      }
+      res.json(program);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to update program" });
+    }
+  });
+
+  app.delete("/api/programs/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteProgram(parseInt(id));
+      if (!success) {
+        return res.status(404).json({ message: "Program not found" });
+      }
+      res.sendStatus(204);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete program" });
+    }
+  });
+
+  // User management routes
+  app.get("/api/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    const users = await storage.getAllUsers();
+    return res.json(users);
+  });
+
+  app.post("/api/users", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(userData);
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.put("/api/users/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const userData = insertUserSchema.parse(req.body);
+      const user = await storage.updateUser(parseInt(id), userData);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteUser(parseInt(id));
+      if (!success) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.sendStatus(204);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // User registration
+  app.post("/api/register", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Validate required fields based on role
+      if (userData.role === "student") {
+        if (!userData.schoolId || !userData.departmentId || !userData.programId || !userData.year) {
+          return res.status(400).json({ error: "Missing required fields for student registration" });
+        }
+        
+        // Check if school exists
+        const school = await storage.getSchool(userData.schoolId);
+        if (!school) {
+          return res.status(400).json({ error: "Invalid school" });
+        }
+        
+        // Check if department exists and belongs to the school
+        const department = await storage.getDepartment(userData.departmentId);
+        if (!department || department.schoolId !== userData.schoolId) {
+          return res.status(400).json({ error: "Invalid department" });
+        }
+        
+        // Check if program exists and belongs to the department
+        const program = await storage.getProgram(userData.programId);
+        if (!program || program.departmentId !== userData.departmentId) {
+          return res.status(400).json({ error: "Invalid program" });
+        }
+      }
+      
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsernameOrEmail(userData.username, userData.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username or email already exists" });
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      
+      // Create user
+      const user = await storage.createUser({
+        ...userData,
+        password: hashedPassword,
+      });
+      
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        console.error("Registration error:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
   });
 
   const httpServer = createServer(app);

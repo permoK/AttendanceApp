@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { insertCourseSchema } from '@shared/schema';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
 
 interface AddCourseModalProps {
   isOpen: boolean;
@@ -35,6 +36,11 @@ const courseFormSchema = insertCourseSchema.pick({
 export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  
+  // Fetch departments
+  const { data: departments = [] } = useQuery<string[]>({
+    queryKey: ['/api/departments'],
+  });
   
   // Create form
   const form = useForm<z.infer<typeof courseFormSchema>>({
@@ -125,11 +131,11 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Computer Science">Computer Science</SelectItem>
-                      <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
-                      <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
-                      <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
-                      <SelectItem value="Business Administration">Business Administration</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

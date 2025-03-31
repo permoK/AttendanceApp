@@ -40,6 +40,11 @@ export default function ReportsPage() {
     enabled: user?.role === "lecturer",
   });
 
+  // Fetch departments
+  const { data: departments = [] } = useQuery<string[]>({
+    queryKey: ['/api/departments'],
+  });
+
   // Fetch attendance statistics
   const { data: attendanceStats = {} } = useQuery<any>({
     queryKey: ["/api/statistics/attendance", courseFilter, periodFilter],
@@ -62,12 +67,11 @@ export default function ReportsPage() {
     { course: "CSC401", attendanceRate: 88 },
   ];
 
-  const departmentAttendanceData = [
-    { name: "Computer Science", value: 85 },
-    { name: "Engineering", value: 78 },
-    { name: "Physics", value: 65 },
-    { name: "Business", value: 72 },
-  ];
+  // Generate department attendance data from departments
+  const departmentAttendanceData = departments.map((dept) => ({
+    name: dept,
+    value: Math.floor(Math.random() * 30) + 70, // Random attendance rate between 70-100%
+  }));
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 

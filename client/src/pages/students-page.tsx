@@ -26,8 +26,12 @@ export default function StudentsPage() {
     enabled: user?.role === "lecturer",
   });
 
-  // Get unique departments and years for filters
-  const departments = Array.from(new Set(students.map((student) => student.department).filter(Boolean) as string[]));
+  // Fetch departments
+  const { data: departments = [] } = useQuery<string[]>({
+    queryKey: ['/api/departments'],
+  });
+
+  // Get unique years for filters
   const years = Array.from(new Set(students.map((student) => student.year).filter(Boolean) as number[]));
 
   // Filter students based on search and filters

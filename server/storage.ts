@@ -2,11 +2,14 @@ import {
   users, type User, type InsertUser,
   courses, type Course, type InsertCourse,
   studentCourses, type StudentCourse, type InsertStudentCourse,
-  attendance as attendanceTable, type Attendance, type InsertAttendance
+  attendance as attendanceTable, type Attendance, type InsertAttendance,
+  departments, type Department, type InsertDepartment,
+  programs, type Program, type InsertProgram,
+  schools, type School, type InsertSchool
 } from "@shared/schema";
 import session from "express-session";
 import { db } from "./db";
-import { eq, and, between, desc, sql } from "drizzle-orm";
+import { eq, and, between, desc, sql, or } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { scrypt, randomBytes } from "crypto";
@@ -20,15 +23,39 @@ export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
   updateUserFaceData(userId: number, faceData: string): Promise<User | undefined>;
+  
+  // School operations
+  getSchools(): Promise<School[]>;
+  createSchool(school: InsertSchool): Promise<School>;
+  updateSchool(id: number, school: InsertSchool): Promise<School | undefined>;
+  deleteSchool(id: number): Promise<boolean>;
+  
+  // Department operations
+  getDepartments(): Promise<Department[]>;
+  getDepartmentsBySchool(schoolId: number): Promise<Department[]>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  updateDepartment(id: number, department: InsertDepartment): Promise<Department | undefined>;
+  deleteDepartment(id: number): Promise<boolean>;
+  
+  // Program operations
+  getAllPrograms(): Promise<Program[]>;
+  getProgramsByDepartment(departmentId: number): Promise<Program[]>;
+  createProgram(program: InsertProgram): Promise<Program>;
+  updateProgram(id: number, program: InsertProgram): Promise<Program | undefined>;
+  deleteProgram(id: number): Promise<boolean>;
   
   // Course operations
   getCourse(id: number): Promise<Course | undefined>;
+  getCoursesByDepartment(departmentId: number): Promise<Course[]>;
   getCoursesByLecturer(lecturerId: number): Promise<Course[]>;
   getActiveCourses(): Promise<Course[]>;
   getAllCourses(): Promise<Course[]>;
-  getDepartments(): Promise<string[]>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourseStatus(id: number, isActive: boolean): Promise<Course | undefined>;
   
@@ -73,6 +100,30 @@ export class DatabaseStorage implements IStorage {
     
     console.log('Seeding initial data...');
     
+    // Add schools
+    const [school1] = await db.insert(schools).values({
+      name: "School of Computing",
+      description: "School of Computing and Information Technology"
+    }).returning();
+
+    const [school2] = await db.insert(schools).values({
+      name: "School of Engineering",
+      description: "School of Engineering and Technology"
+    }).returning();
+
+    // Add departments
+    const [dept1] = await db.insert(departments).values({
+      name: "Computer Science",
+      schoolId: school1.id,
+      description: "Department of Computer Science"
+    }).returning();
+
+    const [dept2] = await db.insert(departments).values({
+      name: "Electrical Engineering",
+      schoolId: school2.id,
+      description: "Department of Electrical Engineering"
+    }).returning();
+    
     // Add lecturers
     const hashedPassword = await hashPassword('password');
     
@@ -84,7 +135,8 @@ export class DatabaseStorage implements IStorage {
       name: "System Administrator",
       role: "admin",
       studentId: "",
-      department: null,
+      schoolId: school1.id,
+      departmentId: dept1.id,
       year: null,
       faceData: null
     }).returning();
@@ -96,7 +148,8 @@ export class DatabaseStorage implements IStorage {
       name: "Dr. Sarah Johnson",
       role: "lecturer",
       studentId: "",
-      department: "Computer Science",
+      schoolId: school1.id,
+      departmentId: dept1.id,
       year: null,
       faceData: null
     }).returning();
@@ -108,7 +161,8 @@ export class DatabaseStorage implements IStorage {
       name: "Prof. John Smith",
       role: "lecturer",
       studentId: "",
-      department: "Electrical Engineering",
+      schoolId: school2.id,
+      departmentId: dept2.id,
       year: null,
       faceData: null
     }).returning();
@@ -121,7 +175,8 @@ export class DatabaseStorage implements IStorage {
       name: "John Smith",
       role: "student",
       studentId: "ST12345",
-      department: "Computer Science",
+      schoolId: school1.id,
+      departmentId: dept1.id,
       year: 3,
       faceData: null
     }).returning();
@@ -133,7 +188,8 @@ export class DatabaseStorage implements IStorage {
       name: "Alice Johnson",
       role: "student",
       studentId: "ST12346",
-      department: "Computer Science",
+      schoolId: school1.id,
+      departmentId: dept1.id,
       year: 2,
       faceData: null
     }).returning();
@@ -145,7 +201,8 @@ export class DatabaseStorage implements IStorage {
       name: "Bob Williams",
       role: "student",
       studentId: "ST12347",
-      department: "Electrical Engineering",
+      schoolId: school2.id,
+      departmentId: dept2.id,
       year: 3,
       faceData: null
     }).returning();
@@ -154,7 +211,7 @@ export class DatabaseStorage implements IStorage {
     const [course1] = await db.insert(courses).values({
       code: "CS101",
       name: "Introduction to Computer Science",
-      department: "Computer Science",
+      departmentId: dept1.id,
       year: 1,
       lecturerId: lecturer1.id,
       schedule: "MWF 10:00 AM - 11:30 AM",
@@ -165,7 +222,7 @@ export class DatabaseStorage implements IStorage {
     const [course2] = await db.insert(courses).values({
       code: "CS301",
       name: "Database Systems",
-      department: "Computer Science",
+      departmentId: dept1.id,
       year: 3,
       lecturerId: lecturer1.id,
       schedule: "TTh 1:00 PM - 2:30 PM",
@@ -176,7 +233,7 @@ export class DatabaseStorage implements IStorage {
     const [course3] = await db.insert(courses).values({
       code: "EE202",
       name: "Circuit Analysis",
-      department: "Electrical Engineering",
+      departmentId: dept2.id,
       year: 2,
       lecturerId: lecturer2.id,
       schedule: "MWF 2:00 PM - 3:30 PM",
@@ -224,8 +281,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
   }
   
   async updateUserFaceData(userId: number, faceData: string): Promise<User | undefined> {
@@ -254,30 +311,32 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(courses);
   }
   
-  async getDepartments(): Promise<string[]> {
-    // Get unique departments from courses
-    const result = await db.select({ department: courses.department })
-      .from(courses)
-      .groupBy(courses.department);
-    
-    // Get unique departments from users
-    const userDepts = await db.select({ department: users.department })
-      .from(users)
-      .where(sql`${users.department} IS NOT NULL`)
-      .groupBy(users.department);
-    
-    // Combine and deduplicate
-    const departments = new Set<string>([
-      ...result.map(r => r.department), 
-      ...userDepts.map(u => u.department).filter(Boolean)
-    ] as string[]);
-    
-    // Default departments if none found
-    if (departments.size === 0) {
-      return ["Computer Science", "Electrical Engineering", "Mechanical Engineering", "Civil Engineering", "Business Administration"];
-    }
-    
-    return Array.from(departments);
+  async getDepartments(): Promise<Department[]> {
+    return await db.select().from(departments);
+  }
+
+  async getDepartmentsBySchool(schoolId: number): Promise<Department[]> {
+    return await db.select().from(departments).where(eq(departments.schoolId, schoolId));
+  }
+
+  async createDepartment(department: InsertDepartment): Promise<Department> {
+    const [newDepartment] = await db.insert(departments).values(department).returning();
+    return newDepartment;
+  }
+
+  async updateDepartment(id: number, department: InsertDepartment): Promise<Department | undefined> {
+    const [updatedDepartment] = await db.update(departments)
+      .set(department)
+      .where(eq(departments.id, id))
+      .returning();
+    return updatedDepartment;
+  }
+
+  async deleteDepartment(id: number): Promise<boolean> {
+    const [deletedDepartment] = await db.delete(departments)
+      .where(eq(departments.id, id))
+      .returning();
+    return !!deletedDepartment;
   }
 
   async createCourse(insertCourse: InsertCourse): Promise<Course> {
@@ -303,7 +362,7 @@ export class DatabaseStorage implements IStorage {
       id: courses.id,
       code: courses.code,
       name: courses.name,
-      department: courses.department,
+      departmentId: courses.departmentId,
       year: courses.year,
       lecturerId: courses.lecturerId,
       schedule: courses.schedule,
@@ -369,6 +428,112 @@ export class DatabaseStorage implements IStorage {
         between(attendanceTable.timestamp, startOfDay, endOfDay)
       ))
       .orderBy(desc(attendanceTable.timestamp));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set(user)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const [deletedUser] = await db.delete(users)
+      .where(eq(users.id, id))
+      .returning();
+    return !!deletedUser;
+  }
+
+  async getAllPrograms(): Promise<Program[]> {
+    return await db.select().from(programs);
+  }
+
+  async getProgramsByDepartment(departmentId: number): Promise<Program[]> {
+    return await db.select().from(programs).where(eq(programs.departmentId, departmentId));
+  }
+
+  async createProgram(program: InsertProgram): Promise<Program> {
+    const [newProgram] = await db.insert(programs).values(program).returning();
+    return newProgram;
+  }
+
+  async updateProgram(id: number, program: InsertProgram): Promise<Program | undefined> {
+    const [updatedProgram] = await db.update(programs)
+      .set(program)
+      .where(eq(programs.id, id))
+      .returning();
+    return updatedProgram;
+  }
+
+  async deleteProgram(id: number): Promise<boolean> {
+    const result = await db
+      .delete(programs)
+      .where(eq(programs.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // School methods
+  async getSchools(): Promise<School[]> {
+    return db.select().from(schools);
+  }
+
+  async createSchool(school: InsertSchool): Promise<School> {
+    const [newSchool] = await db.insert(schools).values(school).returning();
+    return newSchool;
+  }
+
+  async updateSchool(id: number, school: InsertSchool): Promise<School | undefined> {
+    const [updatedSchool] = await db.update(schools)
+      .set(school)
+      .where(eq(schools.id, id))
+      .returning();
+    return updatedSchool;
+  }
+
+  async deleteSchool(id: number): Promise<boolean> {
+    const [deletedSchool] = await db.delete(schools)
+      .where(eq(schools.id, id))
+      .returning();
+    return !!deletedSchool;
+  }
+
+  // Course methods
+  async getCoursesByDepartment(departmentId: number): Promise<Course[]> {
+    return db.select().from(courses).where(eq(courses.departmentId, departmentId));
+  }
+
+  async getUserByUsernameOrEmail(username: string, email: string): Promise<User | null> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          eq(users.username, username),
+          eq(users.email, email)
+        )
+      );
+    return result[0] || null;
+  }
+
+  async getSchool(id: number): Promise<School | null> {
+    const result = await db.select().from(schools).where(eq(schools.id, id));
+    return result[0] || null;
+  }
+
+  async getDepartment(id: number): Promise<Department | null> {
+    const result = await db.select().from(departments).where(eq(departments.id, id));
+    return result[0] || null;
+  }
+
+  async getProgram(id: number): Promise<Program | null> {
+    const result = await db.select().from(programs).where(eq(programs.id, id));
+    return result[0] || null;
   }
 }
 

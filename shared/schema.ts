@@ -2,10 +2,19 @@ import { pgTable, text, serial, integer, boolean, timestamp, primaryKey } from "
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// School table to manage available schools
+export const schools = pgTable("schools", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Department table to manage available departments
 export const departments = pgTable("departments", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
+  schoolId: integer("school_id").notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -29,7 +38,8 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   role: text("role", { enum: ["student", "lecturer", "admin"] }).notNull(),
   studentId: text("student_id").notNull().default(""),
-  department: text("department"),
+  schoolId: integer("school_id"),
+  departmentId: integer("department_id"),
   year: integer("year"),
   faceData: text("face_data"),
 });
@@ -38,7 +48,7 @@ export const courses = pgTable("courses", {
   id: serial("id").primaryKey(),
   code: text("code").notNull(),
   name: text("name").notNull(),
-  department: text("department").notNull(),
+  departmentId: integer("department_id").notNull(),
   year: integer("year").notNull(),
   lecturerId: integer("lecturer_id").notNull(),
   schedule: text("schedule"),
@@ -70,8 +80,14 @@ export const attendance = pgTable("attendance", {
 });
 
 // Insert schemas
+export const insertSchoolSchema = createInsertSchema(schools).pick({
+  name: true,
+  description: true,
+});
+
 export const insertDepartmentSchema = createInsertSchema(departments).pick({
   name: true,
+  schoolId: true,
   description: true,
 });
 
@@ -83,22 +99,24 @@ export const insertProgramSchema = createInsertSchema(programs).pick({
   durationYears: true,
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  email: true,
-  password: true,
-  name: true,
-  role: true,
-  studentId: true,
-  department: true,
-  year: true,
-  faceData: true,
+export const insertUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["student", "lecturer", "admin"]),
+  studentId: z.string().optional(),
+  schoolId: z.number().optional(),
+  departmentId: z.number().optional(),
+  programId: z.number().optional(),
+  year: z.number().min(1).max(4).optional(),
+  faceData: z.string().nullable(),
 });
 
 export const insertCourseSchema = createInsertSchema(courses).pick({
   code: true,
   name: true,
-  department: true,
+  departmentId: true,
   year: true,
   lecturerId: true,
   schedule: true,
@@ -139,6 +157,9 @@ export const activateCourseSchema = z.object({
 });
 
 // Types
+export type InsertSchool = z.infer<typeof insertSchoolSchema>;
+export type School = typeof schools.$inferSelect;
+
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 export type Department = typeof departments.$inferSelect;
 

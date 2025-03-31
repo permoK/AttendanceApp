@@ -199,55 +199,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
-    if (req.user.role === "lecturer") {
-      // Lecturers see only their own courses
-      const courses = await storage.getCoursesByLecturer(req.user.id);
-      return res.json(courses);
-    } else {
-      // For students, we need to filter by:
-      // 1. Courses they're enrolled in (from student_courses table)
-      // 2. Courses in their department and year
-      
-      // Get the student's details first
-      const student = await storage.getUser(req.user.id);
-      if (!student) {
-        return res.status(404).json({ message: "Student not found" });
+    try {
+      if (req.user.role === "admin") {
+        console.log("Admin fetching all courses");
+        // Admins see all courses
+        const courses = await storage.getAllCourses();
+        return res.json(courses);
+      } else if (req.user.role === "lecturer") {
+        // Lecturers see only their own courses
+        const courses = await storage.getCoursesByLecturer(req.user.id);
+        return res.json(courses);
+      } else {
+        // For students, we need to filter by:
+        // 1. Courses they're enrolled in (from student_courses table)
+        // 2. Courses in their department and year
+        
+        // Get the student's details first
+        const student = await storage.getUser(req.user.id);
+        if (!student) {
+          return res.status(404).json({ message: "Student not found" });
+        }
+        
+        // Check if student has completed face verification
+        if (!student.faceData) {
+          return res.status(403).json({ 
+            message: "Face verification required", 
+            requiresFaceRegistration: true 
+          });
+        }
+        
+        // Get courses the student is enrolled in
+        const enrolledCourses = await storage.getStudentCourses(req.user.id);
+        
+        // Get all courses to filter
+        const allCourses = await storage.getAllCourses();
+        
+        // Filter courses by enrollment OR (department AND year)
+        const enrolledCourseIds = enrolledCourses.map(course => course.id);
+        const relevantCourses = allCourses.filter(course => 
+          enrolledCourseIds.includes(course.id) || 
+          (course.departmentId === student.departmentId && course.year === student.year)
+        );
+        
+        return res.json(relevantCourses);
       }
-      
-      // Check if student has completed face verification
-      if (!student.faceData) {
-        return res.status(403).json({ 
-          message: "Face verification required", 
-          requiresFaceRegistration: true 
-        });
-      }
-      
-      // Get courses the student is enrolled in
-      const enrolledCourses = await storage.getStudentCourses(req.user.id);
-      
-      // Get all courses to filter
-      const allCourses = await storage.getAllCourses();
-      
-      // Filter courses by enrollment OR (department AND year)
-      const enrolledCourseIds = enrolledCourses.map(course => course.id);
-      const relevantCourses = allCourses.filter(course => 
-        enrolledCourseIds.includes(course.id) || 
-        (course.departmentId === student.departmentId && course.year === student.year)
-      );
-      
-      return res.json(relevantCourses);
+    } catch (error) {
+      console.error("Error fetching courses:", error);
+      res.status(500).json({ message: "Failed to fetch courses" });
     }
   });
   
   app.post("/api/courses", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "lecturer") {
+    if (!req.isAuthenticated() || (req.user.role !== "lecturer" && req.user.role !== "admin")) {
       return res.status(403).json({ message: "Access denied" });
     }
     
     try {
       const courseData = insertCourseSchema.parse({
         ...req.body,
-        lecturerId: req.user.id,
+        lecturerId: req.user.role === "lecturer" ? req.user.id : req.body.lecturerId,
         isActive: false,
         activatedAt: null
       });
@@ -264,7 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/courses/:id/activate", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "lecturer") {
+    if (!req.isAuthenticated() || (req.user.role !== "lecturer" && req.user.role !== "admin")) {
       return res.status(403).json({ message: "Access denied" });
     }
     
@@ -280,7 +290,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
       
-      if (course.lecturerId !== req.user.id) {
+      // Only check lecturer ownership if the user is a lecturer (not admin)
+      if (req.user.role === "lecturer" && course.lecturerId !== req.user.id) {
         return res.status(403).json({ message: "You are not authorized to modify this course" });
       }
       

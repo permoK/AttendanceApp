@@ -48,7 +48,9 @@ export const courses = pgTable("courses", {
   id: serial("id").primaryKey(),
   code: text("code").notNull(),
   name: text("name").notNull(),
+  schoolId: integer("school_id").notNull(),
   departmentId: integer("department_id").notNull(),
+  programId: integer("program_id").notNull(),
   year: integer("year").notNull(),
   lecturerId: integer("lecturer_id").notNull(),
   schedule: text("schedule"),
@@ -113,15 +115,17 @@ export const insertUserSchema = z.object({
   faceData: z.string().nullable(),
 });
 
-export const insertCourseSchema = createInsertSchema(courses).pick({
-  code: true,
-  name: true,
-  departmentId: true,
-  year: true,
-  lecturerId: true,
-  schedule: true,
-  isActive: true,
-  activatedAt: true,
+export const insertCourseSchema = z.object({
+  code: z.string().min(1, "Course code is required"),
+  name: z.string().min(1, "Course name is required"),
+  schoolId: z.number().min(1, "School is required"),
+  departmentId: z.number().min(1, "Department is required"),
+  programId: z.number().min(1, "Program is required"),
+  year: z.number().min(1, "Year is required"),
+  lecturerId: z.number().min(1, "Lecturer is required"),
+  schedule: z.string().optional(),
+  isActive: z.boolean().default(false),
+  activatedAt: z.date().nullable()
 });
 
 export const insertStudentCourseSchema = createInsertSchema(studentCourses).pick({

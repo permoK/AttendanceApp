@@ -36,6 +36,7 @@ import {
   School,
   InsertSchool
 } from "@shared/schema";
+import { AddCourseModal } from "@/components/admin/add-course-modal";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -141,9 +142,13 @@ export default function AdminDashboard() {
     data: courses = [], 
     isLoading: isLoadingCourses 
   } = useQuery<Course[]>({
-    queryKey: ["/api/courses/all"],
-    enabled: activeTab === "courses"
+    queryKey: ["/api/courses"],
+    enabled: activeTab === "courses",
+    onSuccess: (data) => {
+      console.log("Fetched courses:", data);
+    }
   });
+  
   
   const { 
     data: users = [], 
@@ -389,7 +394,7 @@ export default function AdminDashboard() {
         isActive: false,
         activatedAt: null
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses"] }); // Make sure this matches the query key above
     },
     onError: (error: Error) => {
       toast({
@@ -1623,92 +1628,11 @@ export default function AdminDashboard() {
             </Card>
           )}
 
-          {/* Add Course Dialog */}
-          <Dialog open={showAddCourseDialog} onOpenChange={setShowAddCourseDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Course</DialogTitle>
-                <DialogDescription>
-                  Add a new course to the system. Fill in all required fields.
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="course-code">Course Code *</Label>
-                  <Input
-                    id="course-code"
-                    value={newCourse.code}
-                    onChange={(e) => setNewCourse({ ...newCourse, code: e.target.value })}
-                  />
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label htmlFor="course-name">Course Name *</Label>
-                  <Input
-                    id="course-name"
-                    value={newCourse.name}
-                    onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
-                  />
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label htmlFor="course-department">Department *</Label>
-                  <Select 
-                    value={newCourse.departmentId ? String(newCourse.departmentId) : ""} 
-                    onValueChange={handleDepartmentSelectForCourse}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={String(dept.id)}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label htmlFor="course-year">Year *</Label>
-                  <Input
-                    id="course-year"
-                    type="number"
-                    min={1}
-                    max={6}
-                    value={newCourse.year}
-                    onChange={(e) => setNewCourse({ ...newCourse, year: parseInt(e.target.value) })}
-                  />
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label htmlFor="course-schedule">Schedule</Label>
-                  <Input
-                    id="course-schedule"
-                    value={newCourse.schedule || ""}
-                    onChange={(e) => setNewCourse({ ...newCourse, schedule: e.target.value })}
-                  />
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="course-active"
-                    checked={newCourse.isActive ?? false}
-                    onCheckedChange={(checked) => 
-                      setNewCourse({ ...newCourse, isActive: checked === true })
-                    }
-                  />
-                  <Label htmlFor="course-active">Active</Label>
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button onClick={handleAddCourse}>Add Course</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {/* Add Course Modal */}
+          <AddCourseModal 
+            open={showAddCourseDialog} 
+            onClose={() => setShowAddCourseDialog(false)} 
+          />
 
           {/* Edit Course Dialog */}
           <Dialog open={showEditCourseDialog} onOpenChange={setShowEditCourseDialog}>

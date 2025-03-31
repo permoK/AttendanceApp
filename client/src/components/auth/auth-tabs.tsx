@@ -14,7 +14,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { loginSchema, insertUserSchema } from '@shared/schema';
+import { loginSchema, insertUserSchema, Program, School, Department } from '@shared/schema';
 import { useAuth } from '@/hooks/use-auth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserCheck, Camera, Check, AlertCircle } from 'lucide-react';
@@ -132,7 +132,7 @@ export function AuthTabs() {
   // Handle register submission
   function onRegisterSubmit(values: z.infer<typeof registerFormSchema>) {
     const { confirmPassword, ...userData } = values;
-    registerMutation.mutate(userData, {
+    registerMutation.mutate(userData as any, {
       onSuccess: (user) => {
         if (user.role === 'student') {
           setRegisteredUser(user);

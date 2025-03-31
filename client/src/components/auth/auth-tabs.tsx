@@ -83,10 +83,10 @@ export function AuthTabs() {
   });
   
   // Fetch programs for dropdown
-  const { data: programs = [] } = useQuery<any[]>({
+  const { data: programs = [], isLoading: isLoadingPrograms } = useQuery<Program[]>({
     queryKey: ['/api/programs'],
     enabled: !!selectedDepartment, // Only fetch when a department is selected
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
   
   // Fetch all courses for potential enrollment
@@ -497,10 +497,14 @@ export function AuthTabs() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Program *</FormLabel>
-                            <Select onValueChange={handleProgramSelect} value={field.value?.toString()}>
+                            <Select 
+                              onValueChange={handleProgramSelect} 
+                              value={field.value?.toString()}
+                              disabled={isLoadingPrograms}
+                            >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select your program" />
+                                  <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select your program"} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>

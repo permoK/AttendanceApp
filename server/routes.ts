@@ -553,12 +553,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Program management routes
   app.get("/api/programs", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "admin") {
-      return res.status(403).json({ message: "Access denied" });
+    try {
+      const programs = await storage.getAllPrograms();
+      res.json(programs);
+    } catch (error) {
+      console.error("Error fetching programs:", error);
+      res.status(500).json({ error: "Failed to fetch programs" });
     }
-    
-    const programs = await storage.getAllPrograms();
-    return res.json(programs);
   });
 
   app.post("/api/programs", async (req, res) => {

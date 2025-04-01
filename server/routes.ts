@@ -220,14 +220,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Student not found" });
         }
         
-        // Check if student has completed face verification
-        if (!student.faceData) {
-          return res.status(403).json({ 
-            message: "Face verification required", 
-            requiresFaceRegistration: true 
-          });
-        }
-        
         // Get courses the student is enrolled in
         const enrolledCourses = await storage.getStudentCourses(req.user.id);
         
@@ -323,14 +315,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const student = await storage.getUser(req.user.id);
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
-      }
-      
-      // Check if student has completed face verification
-      if (!student.faceData) {
-        return res.status(403).json({ 
-          message: "Face verification required", 
-          requiresFaceRegistration: true 
-        });
       }
       
       // Get courses the student is enrolled in

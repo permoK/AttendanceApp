@@ -452,6 +452,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    // If password is included in the update, hash it first
+    if (user.password) {
+      user.password = await hashPassword(user.password);
+    }
+    
     const [updatedUser] = await db.update(users)
       .set(user)
       .where(eq(users.id, id))

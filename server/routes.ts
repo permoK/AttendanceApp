@@ -651,6 +651,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userData = insertUserSchema.parse(req.body);
+      
+      // If password is empty, remove it from the update data
+      if (!userData.password) {
+        delete userData.password;
+      }
+      
       const user = await storage.updateUser(parseInt(id), userData);
       if (!user) {
         return res.status(404).json({ message: "User not found" });

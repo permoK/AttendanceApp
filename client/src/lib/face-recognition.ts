@@ -6,25 +6,33 @@ const MODEL_URL = '/models';
 let modelsLoaded = false;
 
 export async function loadModels(): Promise<void> {
+  if (modelsLoaded) {
+    console.log('Models already loaded');
+    return;
+  }
+
   try {
     console.log('Loading face-api.js models...');
-    const modelUrl = '/models';
+    
+    // Check if face-api.js is loaded
+    if (typeof faceapi === 'undefined') {
+      throw new Error('face-api.js library not loaded. Please refresh the page and try again.');
+    }
     
     // Check if models directory is accessible
-    const response = await fetch(modelUrl);
+    const response = await fetch(MODEL_URL);
     if (!response.ok) {
       throw new Error(`Models directory not accessible: ${response.statusText}`);
     }
     
-    console.log('Loading face detection model...');
-    await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+    // Load models in parallel for better performance
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ]);
     
-    console.log('Loading face landmark model...');
-    await faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
-    
-    console.log('Loading face recognition model...');
-    await faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl);
-    
+    modelsLoaded = true;
     console.log('All models loaded successfully');
   } catch (error) {
     console.error('Error loading face-api.js models:', error);
@@ -45,7 +53,7 @@ export async function detectFace(videoEl: HTMLVideoElement): Promise<faceapi.Tin
     .withFaceDescriptor();
     
   if (!result) {
-    throw new Error('No face detected. Please ensure your face is clearly visible.');
+    throw new Error('No face detected. Please ensure your face is clearly visible and centered in the frame.');
   }
   
   return options;
@@ -64,7 +72,7 @@ export async function getFaceDescriptor(videoEl: HTMLVideoElement): Promise<Floa
     .withFaceDescriptor();
     
   if (!result) {
-    throw new Error('No face detected. Please ensure your face is clearly visible.');
+    throw new Error('No face detected. Please ensure your face is clearly visible and centered in the frame.');
   }
   
   return result.descriptor;
@@ -151,8 +159,8 @@ export async function setupWebcam(videoEl: HTMLVideoElement): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: 'user',
-        width: { ideal: 640 },
-        height: { ideal: 480 }
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       },
       audio: false
     });

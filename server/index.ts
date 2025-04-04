@@ -1,70 +1,89 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import https from 'https';
+import fs from 'fs';
+import os from 'os';
+import { setupAuth } from './auth';
+import { registerRoutes } from './routes';
+import { setupVite } from './vite';
 
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Define interface for network interface
+interface NetworkInterface {
+  address: string;
+  family: string;
+  internal: boolean;
+}
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+async function createServer() {
+  const app = express();
+  const isProd = process.env.NODE_ENV === 'production';
+  
+  // Load SSL certificates
+  const certPath = resolve(__dirname, 'certs/cert.pem');
+  const keyPath = resolve(__dirname, 'certs/key.pem');
+  
+  const httpsOptions = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath)
   };
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
+  // Set up Content Security Policy
+  app.use((req, res, next) => {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data: blob:; " +
+      "media-src 'self' blob:; " +
+      "connect-src 'self' ws: wss:; " +
+      "frame-ancestors 'none';"
+    );
+    next();
   });
 
-  next();
-});
+  // Set up CORS for local network access
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    next();
+  });
 
-(async () => {
+  // Set up routes and middleware
+  setupAuth(app);
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (!isProd) {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // Serve static files in production
+    app.use(express.static(resolve(__dirname, '../client/dist')));
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  // Create HTTPS server
+  const httpsServer = https.createServer(httpsOptions, app);
+  
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+  httpsServer.listen(port, '0.0.0.0', () => {
+    console.log(`Server running at https://localhost:${port}`);
+    
+    // Get local IP address
+    const networkInterfaces = os.networkInterfaces();
+    const localIp = Object.values(networkInterfaces)
+      .flat()
+      .find(iface => iface && iface.family === 'IPv4' && !iface.internal)?.address;
+    
+    console.log(`Local network access: https://${localIp || 'your-local-ip'}:${port}`);
   });
-})();
+}
+
+createServer().catch((err) => {
+  console.error('Error starting server:', err);
+  process.exit(1);
+});

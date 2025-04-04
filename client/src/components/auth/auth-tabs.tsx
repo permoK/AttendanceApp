@@ -31,6 +31,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { loadModels, setupWebcam, stopWebcam, captureFaceData } from '@/lib/face-recognition';
 import { apiRequest } from '@/lib/queryClient';
+import { FaceRecognitionModal } from '@/components/student/face-recognition-modal';
 
 const loginFormSchema = z.object({
   identifier: z.string().min(1, 'Username or email is required'),
@@ -153,6 +154,33 @@ export function AuthTabs() {
     });
   }
 
+  // Handle face registration success
+  async function handleFaceRegistrationSuccess(faceData: string) {
+    try {
+      // Save face data to server
+      const response = await apiRequest('POST', '/api/face-data', {
+        faceData
+      });
+
+      if (response.ok) {
+        // Handle course enrollment if courses were selected
+        if (selectedCourses.length > 0) {
+          for (const courseId of selectedCourses) {
+            await apiRequest('POST', '/api/student-courses', {
+              courseId: parseInt(courseId)
+            });
+          }
+        }
+        
+        setShowFaceVerification(false);
+        setSelectedCourses([]);
+        setRegisteredUser(null);
+      }
+    } catch (error) {
+      console.error('Error saving face data:', error);
+    }
+  }
+
   // Initialize face recognition
   useEffect(() => {
     if (showFaceVerification) {
@@ -177,50 +205,6 @@ export function AuthTabs() {
       };
     }
   }, [showFaceVerification]);
-
-  // Handle face capturing and registration
-  async function captureAndRegisterFace() {
-    if (!videoRef.current || !registeredUser) return;
-
-    try {
-      setFaceVerificationStatus('registering');
-      const faceData = await captureFaceData(videoRef.current);
-
-      // Save face data to server
-      const response = await apiRequest('POST', '/api/face-data', {
-        faceData
-      });
-
-      if (response.ok) {
-        setFaceVerificationStatus('success');
-
-        // Handle course enrollment if courses were selected
-        if (selectedCourses.length > 0) {
-          for (const courseId of selectedCourses) {
-            await apiRequest('POST', '/api/student-courses', {
-              courseId: parseInt(courseId)
-            });
-          }
-        }
-      } else {
-        setFaceVerificationStatus('error');
-      }
-    } catch (error) {
-      console.error('Error capturing face:', error);
-      setFaceVerificationStatus('error');
-    }
-  }
-
-  // Close modal and reset
-  function handleCloseVerification() {
-    setShowFaceVerification(false);
-    setFaceVerificationStatus('initial');
-    setSelectedCourses([]);
-    setRegisteredUser(null);
-  }
-
-  // Switch form based on role selection in register form
-  const watchedRole = registerForm.watch('role');
 
   // Handle school selection
   const handleSchoolSelect = (value: string) => {
@@ -452,153 +436,95 @@ export function AuthTabs() {
                   )}
                 />
 
-                {watchedRole === 'student' && (
-                  <>
-                    <FormField
-                      control={registerForm.control}
-                      name="studentId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Student ID</FormLabel>
+                {selectedSchool && (
+                  <FormField
+                    control={registerForm.control}
+                    name="departmentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department *</FormLabel>
+                        <Select
+                          onValueChange={handleDepartmentSelect}
+                          value={field.value?.toString()}
+                          disabled={isLoadingDepartments}
+                        >
                           <FormControl>
-                            <Input placeholder="Enter your student ID" {...field} />
+                            <SelectTrigger>
+                              <SelectValue placeholder={isLoadingDepartments ? "Loading departments..." : "Select your department"} />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-
-                    {selectedSchool && (
-                      <FormField
-                        control={registerForm.control}
-                        name="departmentId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Department *</FormLabel>
-                            <Select
-                              onValueChange={handleDepartmentSelect}
-                              value={field.value?.toString()}
-                              disabled={isLoadingDepartments}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder={isLoadingDepartments ? "Loading departments..." : "Select your department"} />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {departments
-                                  .filter(dept => dept.schoolId === selectedSchool)
-                                  .map((dept) => (
-                                    <SelectItem key={dept.id} value={dept.id.toString()}>
-                                      {dept.name}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          <SelectContent>
+                            {departments
+                              .filter(dept => dept.schoolId === selectedSchool)
+                              .map((dept) => (
+                                <SelectItem key={dept.id} value={dept.id.toString()}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
                     )}
-
-                    {selectedDepartment && (
-                      <FormField
-                        control={registerForm.control}
-                        name="programId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Program *</FormLabel>
-                            <Select
-                              onValueChange={handleProgramSelect}
-                              value={field.value?.toString()}
-                              disabled={isLoadingPrograms}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select your program"} />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {programs
-                                  .filter(prog => prog.departmentId === selectedDepartment)
-                                  .map((prog) => (
-                                    <SelectItem key={prog.id} value={prog.id.toString()}>
-                                      {prog.name}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    <FormField
-                      control={registerForm.control}
-                      name="year"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Year of Study *</FormLabel>
-                          <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select your year" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="1">Year 1</SelectItem>
-                              <SelectItem value="2">Year 2</SelectItem>
-                              <SelectItem value="3">Year 3</SelectItem>
-                              <SelectItem value="4">Year 4</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
+                  />
                 )}
 
-                {watchedRole === 'lecturer' && (
-                  <>
-
-
-                    <FormField
-                      control={registerForm.control}
-                      name="departmentId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department *</FormLabel>
-                          <Select
-                            onValueChange={handleDepartmentSelect}
-                            value={field.value?.toString()}
-                            disabled={isLoadingDepartments}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={isLoadingDepartments ? "Loading departments..." : "Select your department"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {departments
-                                .filter(dept => dept.schoolId === selectedSchool)
-                                .map((dept) => (
-                                  <SelectItem key={dept.id} value={dept.id.toString()}>
-                                    {dept.name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-
-                  </>
+                {selectedDepartment && (
+                  <FormField
+                    control={registerForm.control}
+                    name="programId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Program *</FormLabel>
+                        <Select
+                          onValueChange={handleProgramSelect}
+                          value={field.value?.toString()}
+                          disabled={isLoadingPrograms}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select your program"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {programs
+                              .filter(prog => prog.departmentId === selectedDepartment)
+                              .map((prog) => (
+                                <SelectItem key={prog.id} value={prog.id.toString()}>
+                                  {prog.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
+
+                <FormField
+                  control={registerForm.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Year of Study *</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your year" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1">Year 1</SelectItem>
+                          <SelectItem value="2">Year 2</SelectItem>
+                          <SelectItem value="3">Year 3</SelectItem>
+                          <SelectItem value="4">Year 4</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
                   {registerMutation.isPending ? "Registering..." : "Register"}
@@ -613,102 +539,17 @@ export function AuthTabs() {
         <p>Only users connected to the school network can access this system.</p>
       </div>
 
-      {/* Face Verification Dialog */}
-      <Dialog open={showFaceVerification} onOpenChange={setShowFaceVerification}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Face Verification</DialogTitle>
-            <DialogDescription>
-              {faceVerificationStatus === 'initial' && "Please complete face verification to enable attendance marking."}
-              {faceVerificationStatus === 'success' && "Face verification successful! You can now mark attendance using face recognition."}
-              {faceVerificationStatus === 'error' && "Face verification failed. Please try again."}
-              {faceVerificationStatus === 'registering' && "Processing... Please wait."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {faceVerificationStatus === 'initial' && (
-            <div className="flex flex-col space-y-4">
-              <div className="relative bg-muted rounded-md overflow-hidden w-full h-64 mx-auto">
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="rounded-full w-52 h-52 border-2 border-dashed border-primary opacity-70" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">Select courses to enroll in (optional):</h3>
-                <MultiSelect
-                  options={allCourses.map((course: any) => ({
-                    label: `${course.code}: ${course.name}`,
-                    value: course.id.toString()
-                  }))}
-                  selected={selectedCourses}
-                  onChange={setSelectedCourses}
-                  placeholder="Select courses..."
-                />
-              </div>
-
-              <Button
-                onClick={captureAndRegisterFace}
-                className="w-full"
-              >
-                <Camera className="w-4 h-4 mr-2" /> Capture and Register Face
-              </Button>
-            </div>
-          )}
-
-          {faceVerificationStatus === 'success' && (
-            <div className="flex flex-col items-center justify-center py-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <Check className="w-8 h-8 text-green-600" />
-              </div>
-              <p className="text-center">Your face has been registered successfully.</p>
-              <Button
-                className="mt-4"
-                onClick={handleCloseVerification}
-              >
-                Continue to Dashboard
-              </Button>
-            </div>
-          )}
-
-          {faceVerificationStatus === 'error' && (
-            <div className="flex flex-col items-center justify-center py-4">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <AlertCircle className="w-8 h-8 text-red-600" />
-              </div>
-              <p className="text-center">There was an error registering your face. Please try again.</p>
-              <div className="flex space-x-2 mt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleCloseVerification}
-                >
-                  Skip for now
-                </Button>
-                <Button
-                  onClick={() => setFaceVerificationStatus('initial')}
-                >
-                  Try Again
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {faceVerificationStatus === 'registering' && (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                <p>Processing face data...</p>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Face Verification Modal */}
+      <FaceRecognitionModal
+        isOpen={showFaceVerification}
+        onClose={() => {
+          setShowFaceVerification(false);
+          setSelectedCourses([]);
+          setRegisteredUser(null);
+        }}
+        onSuccess={handleFaceRegistrationSuccess}
+        mode="register"
+      />
     </div>
   );
 }

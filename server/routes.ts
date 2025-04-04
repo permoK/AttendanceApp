@@ -17,6 +17,7 @@ import {
 import { fromZodError } from "zod-validation-error";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import express from "express";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -24,6 +25,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Apply school network middleware to all routes
   app.use(schoolNetworkOnly);
+  
+  // Serve face-api.js models
+  app.use('/models', express.static('client/public/models'));
   
   // School management routes
   app.get("/api/schools", async (req, res) => {

@@ -257,8 +257,7 @@ export default function StudentDashboard() {
           isOpen={isFaceRecognitionOpen}
           onClose={() => setIsFaceRecognitionOpen(false)}
           onSuccess={handleAttendanceSuccess}
-          user={user!}
-          courseId={selectedCourse.id}
+          mode="verify"
         />
       )}
       
@@ -267,7 +266,7 @@ export default function StudentDashboard() {
         <FaceRecognitionModal
           isOpen={showFaceRegistrationModal}
           onClose={() => setShowFaceRegistrationModal(false)}
-          onSuccess={() => {
+          onSuccess={(faceData) => {
             setShowFaceRegistrationModal(false);
             // Refresh user data and active courses
             queryClient.invalidateQueries({ queryKey: ['/api/user'] });
@@ -277,8 +276,7 @@ export default function StudentDashboard() {
               description: "You can now mark attendance for your courses",
             });
           }}
-          user={user}
-          courseId={-1} // Use a placeholder value since we're just registering the face
+          mode="register"
         />
       )}
     </div>

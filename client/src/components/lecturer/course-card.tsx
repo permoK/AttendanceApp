@@ -17,7 +17,7 @@ export function LecturerCourseCard({
   onViewDetails,
   onToggleActive
 }: LecturerCourseCardProps) {
-  const { id, code, name, department, year, isActive, schedule } = course;
+  const { id, code, name, departmentId, year, isActive, schedule } = course;
   
   return (
     <Card className="overflow-hidden">
@@ -28,7 +28,7 @@ export function LecturerCourseCard({
             {isActive ? "Active" : "Inactive"}
           </StatusBadge>
         </div>
-        <p className="text-sm text-gray-600 mb-3">{department}, {year}{getYearSuffix(year)} Year</p>
+        <p className="text-sm text-gray-600 mb-3">{departmentId}, {year}{getYearSuffix(year)} Year</p>
         
         <div className="flex items-center text-sm text-gray-500 mb-3">
           <Users className="h-4 w-4 mr-1" />

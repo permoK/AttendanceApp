@@ -84,7 +84,9 @@ export default function AdminDashboard() {
   const [newCourse, setNewCourse] = useState<InsertCourse>({
     code: "",
     name: "",
+    schoolId: 0,
     departmentId: 0,
+    programId: 0,
     year: 1,
     lecturerId: 0,
     schedule: "",
@@ -144,9 +146,6 @@ export default function AdminDashboard() {
   } = useQuery<Course[]>({
     queryKey: ["/api/courses"],
     enabled: activeTab === "courses",
-    onSuccess: (data) => {
-      console.log("Fetched courses:", data);
-    }
   });
   
   
@@ -388,6 +387,8 @@ export default function AdminDashboard() {
         name: "",
         code: "",
         departmentId: 0,
+        schoolId: 0,
+        programId: 0,
         year: 1,
         lecturerId: 0,
         schedule: "",
@@ -690,6 +691,8 @@ export default function AdminDashboard() {
       name: course.name,
       code: course.code,
       departmentId: course.departmentId,
+      schoolId: course.schoolId,
+      programId: course.programId,
       year: course.year,
       lecturerId: course.lecturerId,
       schedule: course.schedule || "",

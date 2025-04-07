@@ -78,8 +78,8 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
     setSelectedSchool(schoolId);
     setSelectedDepartment(null);
     form.setValue('schoolId', schoolId);
-    form.setValue('departmentId', undefined);
-    form.setValue('programId', undefined);
+    form.setValue('departmentId', 0);
+    form.setValue('programId', 0);
   };
 
   // Handle department selection
@@ -87,7 +87,7 @@ export function AddCourseModal({ isOpen, onClose }: AddCourseModalProps) {
     const departmentId = parseInt(value);
     setSelectedDepartment(departmentId);
     form.setValue('departmentId', departmentId);
-    form.setValue('programId', undefined);
+    form.setValue('programId', 0);
   };
 
   async function onSubmit(values: z.infer<typeof courseFormSchema>) {

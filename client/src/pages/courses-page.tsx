@@ -28,8 +28,8 @@ export default function CoursesPage() {
   });
 
   // Get unique departments and years for filters
-  const departments = [...new Set(courses.map((course) => course.department))];
-  const years = [...new Set(courses.map((course) => course.year))];
+  const departments = Array.from(new Set(courses.map((course) => course.department))).filter(Boolean);
+  const years = Array.from(new Set(courses.map((course) => course.year)));
 
   // Filter courses based on search and filters
   const filteredCourses = courses.filter((course) => {

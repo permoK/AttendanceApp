@@ -19,7 +19,7 @@ export default function SettingsPage() {
   // User profile form state
   const [name, setName] = useState(user?.name || "");
   const [studentId, setStudentId] = useState(user?.studentId || "");
-  const [department, setDepartment] = useState(user?.department || "");
+  const [departmentId, setDepartmentId] = useState<number | null>(user?.departmentId || null);
   
   // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -83,7 +83,7 @@ export default function SettingsPage() {
     updateProfileMutation.mutate({
       name,
       studentId: user?.role === "student" ? studentId : undefined,
-      department: user?.role === "student" ? department : undefined,
+      departmentId: user?.role === "student" ? departmentId : undefined,
     });
   };
   
@@ -166,12 +166,13 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="department">Department</Label>
+                    <Label htmlFor="departmentId">Department</Label>
                     <Input
-                      id="department"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      placeholder="e.g., Computer Science"
+                      id="departmentId"
+                      type="number"
+                      value={departmentId || ""}
+                      onChange={(e) => setDepartmentId(e.target.value ? parseInt(e.target.value) : null)}
+                      placeholder="Department ID"
                     />
                   </div>
                 </>

@@ -124,6 +124,19 @@ export class DatabaseStorage implements IStorage {
       description: "Department of Electrical Engineering"
     }).returning();
     
+    // Add programs
+    const [program1] = await db.insert(programs).values({
+      name: "Computer Science",
+      departmentId: dept1.id,
+      description: "Program in Computer Science"
+    }).returning();
+
+    const [program2] = await db.insert(programs).values({
+      name: "Electrical Engineering",
+      departmentId: dept2.id,
+      description: "Program in Electrical Engineering"
+    }).returning();
+    
     // Add lecturers
     const hashedPassword = await hashPassword('password');
     
@@ -211,7 +224,9 @@ export class DatabaseStorage implements IStorage {
     const [course1] = await db.insert(courses).values({
       code: "CS101",
       name: "Introduction to Computer Science",
+      schoolId: school1.id,
       departmentId: dept1.id,
+      programId: program1.id,
       year: 1,
       lecturerId: lecturer1.id,
       schedule: "MWF 10:00 AM - 11:30 AM",
@@ -222,7 +237,9 @@ export class DatabaseStorage implements IStorage {
     const [course2] = await db.insert(courses).values({
       code: "CS301",
       name: "Database Systems",
+      schoolId: school1.id,
       departmentId: dept1.id,
+      programId: program1.id,
       year: 3,
       lecturerId: lecturer1.id,
       schedule: "TTh 1:00 PM - 2:30 PM",
@@ -233,7 +250,9 @@ export class DatabaseStorage implements IStorage {
     const [course3] = await db.insert(courses).values({
       code: "EE202",
       name: "Circuit Analysis",
+      schoolId: school2.id,
       departmentId: dept2.id,
+      programId: program2.id,
       year: 2,
       lecturerId: lecturer2.id,
       schedule: "MWF 2:00 PM - 3:30 PM",
@@ -325,7 +344,23 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getAllCourses(): Promise<Course[]> {
-    return await db.select().from(courses);
+    return await db
+      .select({
+        id: courses.id,
+        code: courses.code,
+        name: courses.name,
+        schoolId: courses.schoolId,
+        departmentId: courses.departmentId,
+        programId: courses.programId,
+        year: courses.year,
+        lecturerId: courses.lecturerId,
+        schedule: courses.schedule,
+        isActive: courses.isActive,
+        activatedAt: courses.activatedAt,
+        department: departments.name
+      })
+      .from(courses)
+      .leftJoin(departments, eq(courses.departmentId, departments.id));
   }
   
   async getDepartments(): Promise<Department[]> {

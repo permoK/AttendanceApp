@@ -658,7 +658,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If password is empty, remove it from the update data
       if (!userData.password) {
-        delete userData.password;
+        const { password, ...userDataWithoutPassword } = userData;
+        const user = await storage.updateUser(parseInt(id), userDataWithoutPassword);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        const { password: _, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+        return;
       }
       
       const user = await storage.updateUser(parseInt(id), userData);

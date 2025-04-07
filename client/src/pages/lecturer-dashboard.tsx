@@ -284,9 +284,11 @@ export default function LecturerDashboard() {
                   studentId: `ST${10000 + record.studentId}`, // This would come from real data
                   username: '',
                   password: '',
-                  role: 'student',
-                  department: '',
+                  role: 'student' as const,
+                  schoolId: null,
+                  departmentId: null,
                   year: null,
+                  email: '',
                   faceData: null
                 } 
               }))}

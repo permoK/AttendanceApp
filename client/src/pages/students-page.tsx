@@ -27,7 +27,7 @@ export default function StudentsPage() {
   });
 
   // Fetch departments
-  const { data: departments = [] } = useQuery<string[]>({
+  const { data: departments = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['/api/departments'],
   });
 
@@ -45,7 +45,7 @@ export default function StudentsPage() {
       (student.studentId && student.studentId.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Department filter
-    const matchesDepartment = !departmentFilter || student.department === departmentFilter;
+    const matchesDepartment = !departmentFilter || student.departmentId === parseInt(departmentFilter);
 
     // Year filter
     const matchesYear = !yearFilter || student.year === yearFilter;
@@ -93,8 +93,8 @@ export default function StudentsPage() {
           >
             <option value="">All Departments</option>
             {departments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept}
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
               </option>
             ))}
           </select>
@@ -141,7 +141,7 @@ export default function StudentsPage() {
                     </div>
                   </TableCell>
                   <TableCell>{student.studentId}</TableCell>
-                  <TableCell>{student.department}</TableCell>
+                  <TableCell>{departments.find(d => d.id === student.departmentId)?.name || 'Unknown'}</TableCell>
                   <TableCell>{student.year}</TableCell>
                   <TableCell>{student.courses || 0}</TableCell>
                   <TableCell>

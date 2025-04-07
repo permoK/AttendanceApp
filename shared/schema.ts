@@ -174,7 +174,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 export type InsertCourse = z.infer<typeof insertCourseSchema>;
-export type Course = typeof courses.$inferSelect;
+export type Course = typeof courses.$inferSelect & {
+  department?: string | null;
+};
 
 export type InsertStudentCourse = z.infer<typeof insertStudentCourseSchema>;
 export type StudentCourse = typeof studentCourses.$inferSelect;

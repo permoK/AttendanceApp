@@ -132,8 +132,10 @@ export default function AttendancePage() {
               mode="single"
               selected={dateFilter || undefined}
               onSelect={(date) => {
-                setDateFilter(date);
-                setDateOpen(false);
+                if (date) {
+                  setDateFilter(date);
+                  setDateOpen(false);
+                }
               }}
               disabled={(date) => {
                 return !uniqueDates.some((d) => isOnSameDay(d, date));

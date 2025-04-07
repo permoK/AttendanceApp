@@ -54,6 +54,8 @@ async function createServer() {
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     next();
   });
+  
+  app.use(express.json()); // 👈 this is critical
 
   // Set up routes and middleware
   setupAuth(app);

@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
-import https from 'https';
+import http from 'http';
 import fs from 'fs';
 import os from 'os';
 import { setupAuth } from './auth';
@@ -23,15 +23,6 @@ async function createServer() {
   const app = express();
   const isProd = process.env.NODE_ENV === 'production';
   
-  // Load SSL certificates
-  const certPath = resolve(__dirname, 'certs/cert.pem');
-  const keyPath = resolve(__dirname, 'certs/key.pem');
-  
-  const httpsOptions = {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath)
-  };
-
   // Set up Content Security Policy
   app.use((req, res, next) => {
     res.setHeader(
@@ -59,21 +50,21 @@ async function createServer() {
 
   // Set up routes and middleware
   setupAuth(app);
-  const server = await registerRoutes(app);
+  const httpServer = await registerRoutes(app);
 
   if (!isProd) {
-    await setupVite(app, server);
+    await setupVite(app, httpServer);
   } else {
     // Serve static files in production
     app.use(express.static(resolve(__dirname, '../client/dist')));
   }
 
-  // Create HTTPS server
-  const httpsServer = https.createServer(httpsOptions, app);
+  // Create HTTP server
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 3005;
+  const server = http.createServer(app);
   
-  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
-  httpsServer.listen(port, '0.0.0.0', () => {
-    console.log(`Server running at https://localhost:${port}`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`Server running at http://localhost:${port}`);
     
     // Get local IP address
     const networkInterfaces = os.networkInterfaces();
@@ -81,8 +72,10 @@ async function createServer() {
       .flat()
       .find(iface => iface && iface.family === 'IPv4' && !iface.internal)?.address;
     
-    console.log(`Local network access: https://${localIp || 'your-local-ip'}:${port}`);
+    console.log(`Local network access: http://${localIp || 'your-local-ip'}:${port}`);
   });
+  
+  return server;
 }
 
 createServer().catch((err) => {

@@ -17,65 +17,65 @@ export default function StudentDashboard() {
   const { toast } = useToast();
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [isFaceRecognitionOpen, setIsFaceRecognitionOpen] = useState(false);
-  
+
   // Fetch courses
-  const { 
-    data: courses = [], 
-    isLoading: isLoadingCourses 
+  const {
+    data: courses = [],
+    isLoading: isLoadingCourses
   } = useQuery<Course[]>({
     queryKey: ['/api/courses'],
     enabled: !!user,
   });
-  
+
   // Fetch active courses
-  const { 
-    data: activeCourses = [], 
+  const {
+    data: activeCourses = [],
     isLoading: isLoadingActiveCourses,
-    error: activeCoursesError 
+    error: activeCoursesError
   } = useQuery<Course[]>({
     queryKey: ['/api/active-courses'],
     enabled: !!user,
     refetchInterval: 30000, // Refetch every 30 seconds to check for newly activated courses
   });
-  
+
   // Check if the student needs to register face data
   const needsFaceRegistration = activeCoursesError?.message === "Face verification required";
-  
+
   // If the student hasn't registered their face data yet, show a modal
   const [showFaceRegistrationModal, setShowFaceRegistrationModal] = useState(false);
-  
+
   useEffect(() => {
     if (needsFaceRegistration && user) {
       setShowFaceRegistrationModal(true);
     }
   }, [needsFaceRegistration, user]);
-  
+
   // Fetch attendance records
-  const { 
-    data: attendanceRecords = [], 
-    isLoading: isLoadingAttendance 
+  const {
+    data: attendanceRecords = [],
+    isLoading: isLoadingAttendance
   } = useQuery<Attendance[]>({
     queryKey: ['/api/attendance/student'],
     enabled: !!user,
   });
-  
+
   // Mark attendance success handler
   function handleAttendanceSuccess() {
     toast({
       title: "Attendance marked",
       description: "Your attendance has been successfully recorded",
     });
-    
+
     // Refresh attendance data
     queryClient.invalidateQueries({ queryKey: ['/api/attendance/student'] });
   }
-  
+
   // Open face recognition modal for a course
   function handleMarkAttendance(courseId: number) {
     setSelectedCourseId(courseId);
     setIsFaceRecognitionOpen(true);
   }
-  
+
   // View course details
   function handleViewCourseDetails(courseId: number) {
     // For now just show a toast, in a full implementation this would navigate to a course details page
@@ -84,7 +84,7 @@ export default function StudentDashboard() {
       description: `Viewing details for course ID: ${courseId}`,
     });
   }
-  
+
   // View all attendance records
   function handleViewAllAttendance() {
     // For now just show a toast, in a full implementation this would navigate to an attendance page
@@ -93,7 +93,7 @@ export default function StudentDashboard() {
       description: "Viewing all attendance records",
     });
   }
-  
+
   // Get selected course
   const selectedCourse = courses.find(course => course.id === selectedCourseId);
 
@@ -140,67 +140,98 @@ export default function StudentDashboard() {
             Logout
           </Button>
         </div>
-        
+
         {/* Face Registration Alert */}
         {!user?.faceData && (
-          <Alert className="mb-6 border-red-500 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-500" />
-            <AlertTitle className="text-red-500">Face verification required</AlertTitle>
+          <Alert className="mb-6 border-primary bg-primary/5">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <AlertTitle className="text-primary font-medium">Face verification required</AlertTitle>
             <AlertDescription>
-              <p className="text-red-600 mb-2">
-                You need to complete face verification before you can mark attendance for your courses.
-              </p>
-              <Button 
-                size="sm" 
-                className="bg-red-500 hover:bg-red-600 text-white"
-                onClick={() => setShowFaceRegistrationModal(true)}
-              >
-                Register Now
-              </Button>
+              <div className="mt-2 mb-3">
+                <p className="text-gray-700 mb-2">
+                  You need to complete face registration before you can mark attendance for your courses.
+                  Face recognition provides a secure and convenient way to verify your presence in class.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90"
+                    onClick={() => setShowFaceRegistrationModal(true)}
+                  >
+                    Register My Face
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      toast({
+                        title: "Face Registration",
+                        description: "Face registration is required for attendance tracking in this system."
+                      });
+                    }}
+                  >
+                    Learn More
+                  </Button>
+                </div>
+              </div>
             </AlertDescription>
           </Alert>
         )}
 
         {/* Active Class Alert */}
         {activeCourses.length > 0 && (
-          <div className="bg-amber-500 bg-opacity-10 border-l-4 border-amber-500 p-4 rounded-md mb-6">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <BellRing className="h-5 w-5 text-amber-500" />
+          <div className="bg-gradient-to-r from-amber-500/10 to-amber-400/5 border border-amber-200 p-5 rounded-lg shadow-sm mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between">
+              <div className="flex items-start mb-4 md:mb-0">
+                <div className="flex-shrink-0 bg-amber-100 p-2 rounded-full">
+                  <BellRing className="h-6 w-6 text-amber-600" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-base font-semibold text-amber-700">
+                    {activeCourses.length === 1
+                      ? "Class is now in session!"
+                      : `${activeCourses.length} classes are now active!`}
+                  </h3>
+                  <div className="mt-1 text-sm text-gray-700">
+                    {activeCourses.length === 1 ? (
+                      <p className="font-medium">{`${activeCourses[0].code}: ${activeCourses[0].name}`}</p>
+                    ) : (
+                      <p>Multiple classes are in session. Please mark your attendance for each active class.</p>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-amber-500">
-                  {activeCourses.length === 1 
-                    ? "Class is now active!" 
-                    : `${activeCourses.length} classes are now active!`}
-                </h3>
-                <div className="mt-1 text-sm text-gray-700">
-                  {activeCourses.length === 1 ? (
-                    <p>{`${activeCourses[0].code}: ${activeCourses[0].name} is now in session. Mark your attendance with face recognition.`}</p>
-                  ) : (
-                    <p>Multiple classes are in session. Please mark your attendance for each active class.</p>
-                  )}
-                </div>
-                <div className="mt-3 space-y-2">
-                  {activeCourses.map(course => (
-                    <Button 
-                      key={course.id}
-                      onClick={() => handleMarkAttendance(course.id)}
-                      className="bg-amber-500 hover:bg-amber-600 text-white text-sm"
-                    >
-                      Mark Attendance for {course.code}
-                    </Button>
-                  ))}
-                </div>
+
+              <div className="flex flex-wrap gap-2">
+                {activeCourses.map(course => (
+                  <Button
+                    key={course.id}
+                    onClick={() => handleMarkAttendance(course.id)}
+                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-sm"
+                    disabled={!user?.faceData}
+                  >
+                    {user?.faceData ? (
+                      <>Mark Attendance for {course.code}</>
+                    ) : (
+                      <>Register Face First</>
+                    )}
+                  </Button>
+                ))}
               </div>
             </div>
+
+            {!user?.faceData && activeCourses.length > 0 && (
+              <div className="mt-3 text-sm text-amber-700 bg-amber-100 p-2 rounded">
+                <p>You need to register your face before you can mark attendance.</p>
+              </div>
+            )}
           </div>
         )}
 
         {/* My Courses Section */}
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">My Courses</h2>
-          
+
           {isLoadingCourses ? (
             <div className="flex justify-center p-8">
               <div className="w-6 h-6 border-2 border-t-2 border-primary rounded-full animate-spin"></div>
@@ -219,11 +250,11 @@ export default function StudentDashboard() {
                 const courseAttendance = attendanceRecords
                   .filter(record => record.courseId === course.id)
                   .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-                
-                const lastAttended = courseAttendance.length > 0 
-                  ? new Date(courseAttendance[0].timestamp) 
+
+                const lastAttended = courseAttendance.length > 0
+                  ? new Date(courseAttendance[0].timestamp)
                   : null;
-                
+
                 return (
                   <StudentCourseCard
                     key={course.id}
@@ -241,7 +272,7 @@ export default function StudentDashboard() {
         {/* Attendance History Section */}
         <div>
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Attendance</h2>
-          
+
           <StudentAttendanceTable
             attendanceRecords={attendanceRecords.slice(0, 5)}
             courses={courses}
@@ -250,7 +281,7 @@ export default function StudentDashboard() {
           />
         </div>
       </main>
-      
+
       {/* Face Recognition Modal for attendance */}
       {selectedCourse && (
         <FaceRecognitionModal
@@ -260,7 +291,7 @@ export default function StudentDashboard() {
           mode="verify"
         />
       )}
-      
+
       {/* Face Registration Modal */}
       {user && (
         <FaceRecognitionModal

@@ -9,6 +9,7 @@ import { LecturerAttendanceTable } from "@/components/lecturer/attendance-table"
 import { AddCourseModal } from "@/components/lecturer/add-course-modal";
 import { LecturerSidebar } from "@/components/lecturer/sidebar";
 import { StatsCard } from "@/components/lecturer/stats-card";
+import { FaceRegistrationStatus } from "@/components/lecturer/face-registration-status";
 import { Course, Attendance, User } from "@shared/schema";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { Plus } from "lucide-react";
@@ -18,31 +19,31 @@ export default function LecturerDashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
-  
+
   // Fetch courses
-  const { 
-    data: courses = [], 
-    isLoading: isLoadingCourses 
+  const {
+    data: courses = [],
+    isLoading: isLoadingCourses
   } = useQuery<Course[]>({
     queryKey: ['/api/courses'],
     enabled: !!user,
   });
-  
+
   // Get active course (assuming only one can be active at a time)
   const activeCourse = courses.find(course => course.isActive);
-  
+
   // Fetch today's attendance for active course
-  const { 
-    data: todayAttendance = [], 
-    isLoading: isLoadingAttendance 
+  const {
+    data: todayAttendance = [],
+    isLoading: isLoadingAttendance
   } = useQuery<Attendance[]>({
     queryKey: ['/api/attendance/course', activeCourse?.id, 'today'],
     enabled: !!activeCourse,
   });
-  
+
   // Mock data for stats (in a real app, this would come from API)
   const totalStudents = 128; // This would come from actual data
-  
+
   // Activate/deactivate course mutation
   const toggleCourseMutation = useMutation({
     mutationFn: async ({ courseId, isActive }: { courseId: number, isActive: boolean }) => {
@@ -64,11 +65,11 @@ export default function LecturerDashboard() {
       });
     }
   });
-  
+
   function handleToggleCourseActive(courseId: number, isActive: boolean) {
     toggleCourseMutation.mutate({ courseId, isActive });
   }
-  
+
   // View course details
   function handleViewCourseDetails(courseId: number) {
     // For now just show a toast, in a full implementation this would navigate to a course details page
@@ -77,7 +78,7 @@ export default function LecturerDashboard() {
       description: `Viewing details for course ID: ${courseId}`,
     });
   }
-  
+
   // View student attendance
   function handleViewStudentAttendance(studentId: number) {
     // For now just show a toast, in a full implementation this would navigate to a student details page
@@ -137,25 +138,25 @@ export default function LecturerDashboard() {
 
           {/* Stats Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatsCard 
-              title="Total Courses" 
-              value={courses.length} 
-              icon="courses" 
+            <StatsCard
+              title="Total Courses"
+              value={courses.length}
+              icon="courses"
             />
-            <StatsCard 
-              title="Total Students" 
-              value={totalStudents} 
-              icon="students" 
+            <StatsCard
+              title="Total Students"
+              value={totalStudents}
+              icon="students"
             />
-            <StatsCard 
-              title="Active Sessions" 
-              value={courses.filter(c => c.isActive).length} 
-              icon="active" 
+            <StatsCard
+              title="Active Sessions"
+              value={courses.filter(c => c.isActive).length}
+              icon="active"
             />
-            <StatsCard 
-              title="Today's Attendance" 
-              value={todayAttendance.length} 
-              icon="attendance" 
+            <StatsCard
+              title="Today's Attendance"
+              value={todayAttendance.length}
+              icon="attendance"
             />
           </div>
 
@@ -164,8 +165,8 @@ export default function LecturerDashboard() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Active Course</h3>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   size="sm"
                   onClick={() => handleToggleCourseActive(activeCourse.id, false)}
                   disabled={toggleCourseMutation.isPending}
@@ -173,7 +174,7 @@ export default function LecturerDashboard() {
                   {toggleCourseMutation.isPending ? "Deactivating..." : "Deactivate"}
                 </Button>
               </div>
-              
+
               <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
                 <div>
                   <h4 className="text-base font-medium text-gray-800">
@@ -189,7 +190,7 @@ export default function LecturerDashboard() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="bg-gray-100 p-4 rounded-md mb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -217,9 +218,9 @@ export default function LecturerDashboard() {
                   </span>
                 </div>
               </div>
-              
-              <Button 
-                variant="link" 
+
+              <Button
+                variant="link"
                 className="text-primary hover:text-primary/80 text-sm p-0"
                 onClick={() => handleViewCourseDetails(activeCourse.id)}
               >
@@ -239,14 +240,14 @@ export default function LecturerDashboard() {
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">My Courses</h3>
-              <Button 
+              <Button
                 onClick={() => setIsAddCourseModalOpen(true)}
                 className="flex items-center"
               >
                 <Plus className="h-4 w-4 mr-1" /> Add Course
               </Button>
             </div>
-            
+
             {isLoadingCourses ? (
               <div className="flex justify-center p-8">
                 <div className="w-6 h-6 border-2 border-t-2 border-primary rounded-full animate-spin"></div>
@@ -275,30 +276,40 @@ export default function LecturerDashboard() {
 
           {/* Today's Attendance Section */}
           {activeCourse && (
-            <LecturerAttendanceTable
-              attendanceRecords={todayAttendance.map(record => ({ 
-                ...record, 
-                student: { 
-                  id: record.studentId, 
-                  name: `Student ${record.studentId}`, // This would come from real data
-                  studentId: `ST${10000 + record.studentId}`, // This would come from real data
-                  username: '',
-                  password: '',
-                  role: 'student' as const,
-                  schoolId: null,
-                  departmentId: null,
-                  year: null,
-                  email: '',
-                  faceData: null
-                } 
-              }))}
-              onViewAttendance={handleViewStudentAttendance}
-              isLoading={isLoadingAttendance}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Today's Attendance</h3>
+                <LecturerAttendanceTable
+                  attendanceRecords={todayAttendance.map(record => ({
+                    ...record,
+                    student: {
+                      id: record.studentId,
+                      name: `Student ${record.studentId}`, // This would come from real data
+                      studentId: `ST${10000 + record.studentId}`, // This would come from real data
+                      username: '',
+                      password: '',
+                      role: 'student' as const,
+                      schoolId: null,
+                      departmentId: null,
+                      year: null,
+                      email: '',
+                      faceData: null
+                    }
+                  }))}
+                  onViewAttendance={handleViewStudentAttendance}
+                  isLoading={isLoadingAttendance}
+                />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Face Registration Status</h3>
+                <FaceRegistrationStatus courseId={activeCourse.id} />
+              </div>
+            </div>
           )}
         </main>
       </div>
-      
+
       {/* Add Course Modal */}
       <AddCourseModal
         isOpen={isAddCourseModalOpen}
@@ -320,7 +331,7 @@ function formatTime(date: Date | string | null): string {
 
 function getYearSuffix(year: number | null): string {
   if (!year) return '';
-  
+
   if (year === 1) return 'st';
   if (year === 2) return 'nd';
   if (year === 3) return 'rd';
